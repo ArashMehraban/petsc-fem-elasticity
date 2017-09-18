@@ -2,6 +2,6 @@
 Petsc FEM code based on Brown Model
 
 To run the code:
-make main.c
-mpiexec -n 2 ./main -nq1d 2 -f disk4_114e_us.exo
+make all
+mpiexec -n 2 ./main -polydegree 2 -dof 1 -f cube4.exo -interpolate
 
