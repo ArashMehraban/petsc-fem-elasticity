@@ -7,11 +7,12 @@ include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 
 
-all: main 
+all: main
 
-main: main.o chkopts
-	-${CLINKER} -o main main.o ${PETSC_KSP_LIB} ${PETSC_LIB} ${PETSC_SNES_LIB}
-	${RM} main.o
+main: main.o fe.o user.o chkopts
+	-${CLINKER} -o main main.o fe.o user.o ${PETSC_KSP_LIB} ${PETSC_LIB} ${PETSC_SNES_LIB}
+	${RM} main.o fe.o user.o
+
 
 
 
