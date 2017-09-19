@@ -25,14 +25,25 @@ int main(int argc, char **argv)
   PetscErrorCode    ierr;
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
+  Vec   u;
+  FE fe;
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help); CHKERRQ(ierr);
 
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &rank); CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_SELF,"Hello from process: %d\n", rank);CHKERRQ(ierr);
 
-  ierr = processUserOptions(PETSC_COMM_WORLD, user);CHKERRQ(ierr);
-  ierr = dmMeshSetup(PETSC_COMM_WORLD, user, &dm);CHKERRQ(ierr);
+  ierr = processUserOptions(PETSC_COMM_WORLD, &user);CHKERRQ(ierr);
+  ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
+  ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
+  ierr = DMSetApplicationContext(dm, &user);CHKERRQ(ierr);
+  //ierr = DMView(dm,v); CHKERRQ(ierr);
+  ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
+  //ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
+
+  ierr = DMCreateGlobalVector(dm, &u);CHKERRQ(ierr);
+  //VecView(u,PETSC_VIEWER_STDOUT_WORLD);
+
 
   ierr = PetscFinalize();CHKERRQ(ierr);
 
