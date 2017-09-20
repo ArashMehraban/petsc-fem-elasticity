@@ -13,6 +13,7 @@ static char help[] = "fem-elasticity";
 #include "pointwise.h"
 #include "fe.h"
 #include "user.h"
+#include "exact.h"
 
 //PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
 //PetscErrorCode FormJacobian(SNES,Vec, Mat,Mat, void*);
@@ -25,7 +26,7 @@ int main(int argc, char **argv)
   PetscErrorCode    ierr;
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
-  Vec   u;
+  Vec               exactSol;
   FE fe;
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help); CHKERRQ(ierr);
@@ -35,14 +36,17 @@ int main(int argc, char **argv)
 
   ierr = processUserOptions(PETSC_COMM_WORLD, &user);CHKERRQ(ierr);
   ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
-  ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
+  //ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
   ierr = DMSetApplicationContext(dm, &user);CHKERRQ(ierr);
   //ierr = DMView(dm,v); CHKERRQ(ierr);
   ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
   //ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
 
-  ierr = DMCreateGlobalVector(dm, &u);CHKERRQ(ierr);
+  ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
   //VecView(u,PETSC_VIEWER_STDOUT_WORLD);
+
+  ierr = computeExact(dm, exactSol);
+  VecView(exactSol,PETSC_VIEWER_STDOUT_WORLD);
 
 
   ierr = PetscFinalize();CHKERRQ(ierr);
