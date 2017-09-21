@@ -36,9 +36,9 @@ int main(int argc, char **argv)
 
   ierr = processUserOptions(PETSC_COMM_WORLD, &user);CHKERRQ(ierr);
   ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
-  //ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
+  ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
   ierr = DMSetApplicationContext(dm, &user);CHKERRQ(ierr);
-  //ierr = DMView(dm,v); CHKERRQ(ierr);
+
   ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
   //ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
 
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
   //VecView(u,PETSC_VIEWER_STDOUT_WORLD);
 
   ierr = computeExact(dm, exactSol);
-  VecView(exactSol,PETSC_VIEWER_STDOUT_WORLD);
+  //VecView(exactSol,PETSC_VIEWER_STDOUT_WORLD);
 
 
   ierr = PetscFinalize();CHKERRQ(ierr);
