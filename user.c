@@ -47,7 +47,7 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
            cStart,cEnd,    //cells (elements)
            vStart,vEnd,    //vertices
            dim,
-	         i,j,jj,
+	         i,j,
            numPoints,      //number of points in TransitiveClosure
            *points;        //array of points in TransitiveClosure;            //dimension
 	const char     *filename    = user->filename;
@@ -61,7 +61,8 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   PetscInt *perm_idx,         //permutation array index for local ordering
             sz_perm_idx=0,    //size of permutation array index
             perm27_idx[] = {19, 10, 22, 16, 3, 15, 23, 11, 24, 7, 1, 9, 6, 0, 5, 14, 2, 12, 20, 8, 21, 17, 4, 18, 26, 13, 25},
-            perm8_idx[] = {0,1,4,5,6,2,3,8,7};
+            perm8_idx[] = {1,0,2,3,5,4,6,7};
+            //perm8_idx[] = {1,4,5,6,2,3,8,7};
   //PetscInt const *myCone;
 
 
@@ -134,24 +135,33 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   sz_conn = sz_perm_idx*(cEnd-cStart);
   ierr = PetscMalloc1(sz_conn, &conn); CHKERRQ(ierr);
   //for each element
-     for(i = cStart ; i <cEnd; i++)
-     {
-       points=NULL;
-       //get the TransitiveClosure of each element
-       ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
-       for(j = 0,jj=0; j < numPoints ; j++){
+
+  for(i = cStart ; i <cEnd; i++)
+  {
+     points=NULL;
+     //get the TransitiveClosure of each element
+     ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
+     PetscInt k =0;
+     for(j = 0; j < numPoints ; j++){
          PetscInt tmpdof;
-         PetscSectionGetDof(section, points[j], &tmpdof);
+         PetscSectionGetDof(section, points[2*j], &tmpdof);
          if (!tmpdof) continue;
          //permute the TransitiveClosure of each elemet according to perm_idx
-         conn[numPoints*i+j] = points[2*perm_idx[jj++]];
-       }
-        ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
+         conn[numPoints*i+k] = points[2*perm_idx[k]];
+         k=k+1;
      }
+        ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
+  }
 
-     //set the connectivity (conn) to user->conn
+    //set the connectivity (conn) to user->conn
      user->conn = conn;
 
+    /*
+     ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
+     for(i=0; i < sz_conn; i++){
+       ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d \n",i,conn[i]);CHKERRQ(ierr);
+     }
+    */
 
   //Destroy PetscSection
 	PetscSectionDestroy(&section);
@@ -185,73 +195,61 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
     //in hierarchy of mesh topology, get all the vertices. (Depth 0)
     if(interpolated){
     ierr = DMPlexGetDepthStratum(dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
-  	ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of vertex %d\n\n\n", rank,vEnd-vStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  	ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of vertex %d\n\n\n", rank,vEnd-vStart);CHKERRQ(ierr);
   	for(i = vStart ; i <vEnd; i++)
   	{
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
   		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d vertex Idx %d\n",rank, i);CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
   	}
 
 
     //in hierarchy of mesh topology, get all the edges. (Depth 1)
     ierr = DMPlexGetDepthStratum(dm, 1, &eStart,&eEnd);CHKERRQ(ierr);
-  	ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of edges %d\n\n\n", rank,eEnd-eStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  	ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of edges %d\n\n\n", rank,eEnd-eStart);CHKERRQ(ierr);
   	for(i = eStart ; i <eEnd; i++)
   	{
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
-  		ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d edge Idx %d : [%d,  %d]\n",rank, i, myCone[0], myCone[1]);CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d edge Idx %d : [%d,  %d]\n",rank, i, myCone[0], myCone[1]);CHKERRQ(ierr);
   	}
 
 
     //in hierarchy of mesh topology, get all the faces. (Depth 2)
     ierr = DMPlexGetDepthStratum(dm, 2, &fStart,&fEnd);CHKERRQ(ierr);
-  	ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of Faces %d\n\n\n", rank,fEnd-fStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  	ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of Faces %d\n\n\n", rank,fEnd-fStart);CHKERRQ(ierr);
    	for(i = fStart ; i <fEnd; i++)
   	{
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
-  		ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d face Idx %d : [%d,  %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3] );CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d face Idx %d : [%d,  %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3] );CHKERRQ(ierr);
   	}
 
     //in hierarchy of mesh topology, get all the cells (elements). (Depth 3)
     ierr = DMPlexGetDepthStratum(dm, 3, &cStart,&cEnd);CHKERRQ(ierr);
-    ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of cells %d\n\n\n", rank,cEnd-cStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of cells %d\n\n\n", rank,cEnd-cStart);CHKERRQ(ierr);
   	for(i = cStart ; i <cEnd; i++)
   	{
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
-  		ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d cell Idx %d : [%d,  %d, %d, %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3],myCone[4], myCone[5] );CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d cell Idx %d : [%d,  %d, %d, %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3],myCone[4], myCone[5] );CHKERRQ(ierr);
     }
 
   }
   else{
 
     ierr = DMPlexGetDepthStratum(dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
-  	ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of vertex %d\n\n\n", rank,vEnd-vStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  	ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of vertex %d\n\n\n", rank,vEnd-vStart);CHKERRQ(ierr);
   	for(i = vStart ; i <vEnd; i++)
   	{
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
-  		ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d vertex Idx %d\n",rank, i);CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+  		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d vertex Idx %d\n",rank, i);CHKERRQ(ierr);
   	}
 
     //in hierarchy of mesh non-interpolated topology, get all the cells (elements). (Depth 1)
     ierr = DMPlexGetDepthStratum(dm, 1, &cStart,&cEnd);CHKERRQ(ierr);
-    ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d number of cells %d\n\n\n", rank,cEnd-cStart);CHKERRQ(ierr);
-    ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"process %d number of cells %d\n\n\n", rank,cEnd-cStart);CHKERRQ(ierr);
     for(i = cStart ; i <cEnd; i++)
     {
       ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
-      ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"process %d cell Idx %d : [%d,  %d, %d, %d, %d, %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3],
+      ierr = PetscPrintf(PETSC_COMM_SELF,"process %d cell Idx %d : [%d,  %d, %d, %d, %d, %d, %d, %d]\n",rank, i, myCone[0], myCone[1],myCone[2], myCone[3],
                                                                                                           myCone[4], myCone[5],myCone[6], myCone[7] );CHKERRQ(ierr);
-      ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
     }
 
 
@@ -262,19 +260,17 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
         points=NULL;
         //get the TransitiveClosure of each element
         ierr = DMPlexGetTransitiveClosure(dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
-        ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"\nnumber of points in TransitiveClosure:  %d\n", numPoints);CHKERRQ(ierr);
-        ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
+        ierr = PetscPrintf(PETSC_COMM_SELF,"\nnumber of points in TransitiveClosure:  %d\n", numPoints);CHKERRQ(ierr);
         ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"TransitiveClosure ordering\n");CHKERRQ(ierr);
-        ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
         ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"----------------------------\n");CHKERRQ(ierr);
-        ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
         for(j = 0; j < numPoints ; j++){
-          ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"%d--> %d\n", j, points[2*j]);CHKERRQ(ierr);
-          ierr = PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);CHKERRQ(ierr);
-          ierr = DMPlexRestoreTransitiveClosure(dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
+          ierr = PetscPrintf(PETSC_COMM_SELF,"%d--> %d\n", j, points[2*j]);CHKERRQ(ierr);
         }
+          ierr = DMPlexRestoreTransitiveClosure(dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
 
+    //NOTE: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
+    //      that it creates is faulty as the source code requires a PetscDS while we don't have it.
     {
       PetscViewer view;
       Vec X;
@@ -282,9 +278,12 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
       PetscInt sz_X;
 
       ierr = DMCreateGlobalVector(dm,&X);CHKERRQ(ierr);
+
       ierr = VecGetArray(X, &x);CHKERRQ(ierr);
       ierr = VecGetSize(X, &sz_X); CHKERRQ(ierr);
       ierr = PetscMalloc1(sz_X,&arr);CHKERRQ(ierr);
+
+      //ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
       for(i = 0 ; i<sz_X ; i++){
         arr[i] = i;
@@ -296,12 +295,11 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
       ierr = PetscViewerSetType(view, PETSCVIEWERVTK);CHKERRQ(ierr);
       ierr = PetscViewerFileSetName(view, "elem.vtu");CHKERRQ(ierr);
       ierr = VecView(X, view);CHKERRQ(ierr);
-      ierr = VecView(X, PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+      //ierr = VecView(X, PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
       ierr = PetscViewerDestroy(&view);CHKERRQ(ierr);
       ierr = PetscFree(x);CHKERRQ(ierr);
       ierr = PetscFree(arr);CHKERRQ(ierr);
     }
+
       PetscFunctionReturn(0);
-
-
 }
