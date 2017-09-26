@@ -11,7 +11,6 @@
 {
   MPI_Comm comm;
   PetscInt polydegree; //Finite Element polynomial degree
-  PetscInt dof;        //number of degrees of freedom per vertex
   struct{
     PetscReal *B;
     PetscReal *D;
