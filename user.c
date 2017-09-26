@@ -69,9 +69,8 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 
   ierr = PetscNew(&fe);CHKERRQ(ierr);
   fe->polydegree = user->polydegree;
-
-  //NOTE: why is the following line an error of "warning: implicit declaration of function"?
-  //ierr = FESetUp(fe);CHKERRQ(ierr);
+  //initialize finite element space (fe)
+  ierr = FESetup(fe);CHKERRQ(ierr);
 
   //Create a dmplex from Exodus-II file
   ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm);CHKERRQ(ierr);
@@ -285,37 +284,38 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
           ierr = DMPlexRestoreTransitiveClosure(dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
 
-    // NOTE: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
+    // NOTE 2: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
     //      that it creates is faulty as the source code requires a PetscDS while we don't have it.
-    {
-      PetscViewer view;
-      Vec X;
-      PetscScalar *x, *arr;
-      PetscInt sz_X;
-
-      ierr = DMCreateGlobalVector(dm,&X);CHKERRQ(ierr);
-
-      ierr = VecGetArray(X, &x);CHKERRQ(ierr);
-      ierr = VecGetSize(X, &sz_X); CHKERRQ(ierr);
-      ierr = PetscMalloc1(sz_X,&arr);CHKERRQ(ierr);
-
-      // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-
-      for(i = 0 ; i<sz_X ; i++){
-        arr[i] = i;
-        x[user->conn[i]] += arr[i];
-      }
-
-      ierr = VecRestoreArray(X,&x);CHKERRQ(ierr);
-      ierr = PetscViewerCreate(PETSC_COMM_SELF,&view);CHKERRQ(ierr);
-      ierr = PetscViewerSetType(view, PETSCVIEWERVTK);CHKERRQ(ierr);
-      ierr = PetscViewerFileSetName(view, "elem.vtu");CHKERRQ(ierr);
-      ierr = VecView(X, view);CHKERRQ(ierr);
-      //ierr = VecView(X, PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&view);CHKERRQ(ierr);
-      ierr = PetscFree(x);CHKERRQ(ierr);
-      ierr = PetscFree(arr);CHKERRQ(ierr);
-    }
+    // NOTE 1 : Works with 1 dof only
+    // {
+    //   PetscViewer view;
+    //   Vec X;
+    //   PetscScalar *x, *arr;
+    //   PetscInt sz_X;
+    //
+    //   ierr = DMCreateGlobalVector(dm,&X);CHKERRQ(ierr);
+    //
+    //   ierr = VecGetArray(X, &x);CHKERRQ(ierr);
+    //   ierr = VecGetSize(X, &sz_X); CHKERRQ(ierr);
+    //   ierr = PetscMalloc1(sz_X,&arr);CHKERRQ(ierr);
+    //
+    //   // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+    //
+    //   for(i = 0 ; i<sz_X ; i++){
+    //     arr[i] = i;
+    //     x[user->conn[i]] += arr[i];
+    //   }
+    //
+    //   ierr = VecRestoreArray(X,&x);CHKERRQ(ierr);
+    //   ierr = PetscViewerCreate(PETSC_COMM_SELF,&view);CHKERRQ(ierr);
+    //   ierr = PetscViewerSetType(view, PETSCVIEWERVTK);CHKERRQ(ierr);
+    //   ierr = PetscViewerFileSetName(view, "elem.vtu");CHKERRQ(ierr);
+    //   ierr = VecView(X, view);CHKERRQ(ierr);
+    //   //ierr = VecView(X, PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+    //   ierr = PetscViewerDestroy(&view);CHKERRQ(ierr);
+    //   ierr = PetscFree(x);CHKERRQ(ierr);
+    //   ierr = PetscFree(arr);CHKERRQ(ierr);
+    // }
 
       PetscFunctionReturn(0);
 }
