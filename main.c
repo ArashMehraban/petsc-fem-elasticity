@@ -22,17 +22,17 @@ static char help[] = "fem-elasticity";
 #define __FUNCT__ "main"
 int main(int argc, char **argv)
 {
-  PetscMPIInt       rank;
+  //PetscMPIInt       rank;
   PetscErrorCode    ierr;
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
   Vec               exactSol;
-  FE fe;
+  FE                fe;
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help); CHKERRQ(ierr);
 
-  ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &rank); CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_SELF,"Hello from process: %d\n", rank);CHKERRQ(ierr);
+  //ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &rank); CHKERRQ(ierr);
+  //ierr = PetscPrintf(PETSC_COMM_SELF,"Hello from process: %d\n", rank);CHKERRQ(ierr);
 
   ierr = processUserOptions(PETSC_COMM_WORLD, &user);CHKERRQ(ierr);
   ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
