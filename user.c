@@ -49,27 +49,41 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
            dim,
 	         i,j,
            numPoints,      //number of points in TransitiveClosure
-           *points;        //array of points in TransitiveClosure;            //dimension
+           *points;        //array of points in TransitiveClosure
 	const char     *filename    = user->filename;
 	PetscBool      interpolate  = user->interpolate;
 	PetscInt       dof          = user->dof;
 	PetscErrorCode ierr;
 	Vec            coords;
 	DM distributedMesh = NULL;
-  PetscSection section;
-  PetscInt *conn, sz_conn;
-  PetscInt *perm_idx,         //permutation array index for local ordering
-            sz_perm_idx=0,    //size of permutation array index
-            perm27_idx[] = {19, 10, 22, 16, 3, 15, 23, 11, 24, 7, 1, 9, 6, 0, 5, 14, 2, 12, 20, 8, 21, 17, 4, 18, 26, 13, 25},
-            perm8_idx[] = {1,0,2,3,5,4,6,7};
-            //perm8_idx[] = {1,4,5,6,2,3,8,7};
-  //PetscInt const *myCone;
+  PetscSection   section;
+  PetscInt       *conn, sz_conn;
+  PetscInt       *perm_idx,         //permutation array index for local ordering
+                 sz_perm_idx=0,    //size of permutation array index
+                 perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
+                 perm8_idx[] = {1,0,2,3,5,4,6,7};
+  FE             fe;
 
 
 	PetscFunctionBeginUser;
 
+  ierr = PetscNew(&fe);CHKERRQ(ierr);
+  fe->polydegree = user->polydegree;
+
+  //NOTE: why is the following line an error of "warning: implicit declaration of function"?
+  //ierr = FESetUp(fe);CHKERRQ(ierr);
+
   //Create a dmplex from Exodus-II file
   ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm);CHKERRQ(ierr);
+
+  /* How to deal with boundary
+  PetscInt vtx, boundary=0;
+  for all vertices{                                   400, 500, 600
+  ierr = DMPlexGetLabelValue(dm, "Vertex Sets",vtx, &boundary )
+                                                   100 or 200, 300
+  ierr = DMPlexGetLabelValue(dm, "Face Sets",fce, &boundary )
+  }
+  */
 
 	/* Distribute mesh over processors */
 	DMPlexDistribute(*dm, 0, NULL, &distributedMesh);
@@ -156,6 +170,9 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
     //set the connectivity (conn) to user->conn
      user->conn = conn;
 
+
+
+
     /*
      ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
      for(i=0; i < sz_conn; i++){
@@ -211,7 +228,6 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
   		ierr = DMPlexGetCone(dm, i, &myCone);CHKERRQ(ierr);
   		ierr = PetscPrintf(PETSC_COMM_SELF,"process %d edge Idx %d : [%d,  %d]\n",rank, i, myCone[0], myCone[1]);CHKERRQ(ierr);
   	}
-
 
     //in hierarchy of mesh topology, get all the faces. (Depth 2)
     ierr = DMPlexGetDepthStratum(dm, 2, &fStart,&fEnd);CHKERRQ(ierr);
@@ -269,7 +285,7 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
           ierr = DMPlexRestoreTransitiveClosure(dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
 
-    //NOTE: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
+    // NOTE: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
     //      that it creates is faulty as the source code requires a PetscDS while we don't have it.
     {
       PetscViewer view;
@@ -283,7 +299,7 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
       ierr = VecGetSize(X, &sz_X); CHKERRQ(ierr);
       ierr = PetscMalloc1(sz_X,&arr);CHKERRQ(ierr);
 
-      //ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+      // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
       for(i = 0 ; i<sz_X ; i++){
         arr[i] = i;
