@@ -3,6 +3,7 @@
 
 #include<petscdmplex.h>
 /*for dm and dmplex objects*/
+#include "fe.h"
 
 
 typedef struct{
