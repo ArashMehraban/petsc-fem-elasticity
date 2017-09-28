@@ -13,6 +13,7 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
   userOptions->filename[0] = '\0';  // mesh file to read
   userOptions->polydegree = 0;      //Finite Element polynomial degree
   userOptions->dof = 0;             //degrees of freedom (dof) per vertex
+  userOptions->ne = 1;              //default number of elements to extract per iteration
 
   //start setting user options from command line
   ierr = PetscOptionsBegin(comm, "", "FEM elasticity options such as mesh filename, polynomial degree,  etc. ", "DMPLEX");CHKERRQ(ierr);
@@ -33,6 +34,8 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
   // set the number of quadrature points in 1D for the mesh data
   ierr = PetscOptionsInt("-dof", "number of degrees of freedom at each mesh point", "main", userOptions->dof, &userOptions->dof, NULL);CHKERRQ(ierr);
 
+  ierr = PetscOptionsInt("-ne", "number of elements to extract per iteration", "main", userOptions->ne, &userOptions->ne, NULL);CHKERRQ(ierr);
+
   //End setting up user options
   PetscOptionsEnd();
 
@@ -43,25 +46,28 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
 #define __FUNCT__ "dmMeshSetup"
 PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 {
-  PetscInt pStart, pEnd,   //all points (nodes) in mesh
-           cStart,cEnd,    //cells (elements)
-           vStart,vEnd,    //vertices
-           dim,
-	         i,j,
-           numPoints,      //number of points in TransitiveClosure
-           *points;        //array of points in TransitiveClosure
+  PetscInt       pStart, pEnd,   //all points (nodes) in mesh
+                 cStart,cEnd,    //cells (elements)
+                 numCells,       //number of cell for the current processor
+                 vStart,vEnd,    //vertices
+                 dim,
+	               i,j,k,
+                 numPoints,      //number of points in TransitiveClosure
+                 *points;        //array of points in TransitiveClosure
 	const char     *filename    = user->filename;
 	PetscBool      interpolate  = user->interpolate;
 	PetscInt       dof          = user->dof;
+  PetscInt       ne           = user->ne;
 	PetscErrorCode ierr;
 	Vec            coords;
 	DM distributedMesh = NULL;
   PetscSection   section;
-  PetscInt       *conn, sz_conn;
+  PetscInt       *conn, *tmp_conn, sz_conn;
   PetscInt       *perm_idx,         //permutation array index for local ordering
-                 sz_perm_idx=0,    //size of permutation array index
+                 sz_perm_idx=0,     //size of permutation array index
                  perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
-                 perm8_idx[] = {1,0,2,3,5,4,6,7};
+                 //perm8_idx[]  = {1,0,2,3,5,4,6,7}
+                 perm8_idx[]  = {2,1,3,4,6,5,7,8};
   FE             fe;
 
 
@@ -71,6 +77,7 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   fe->polydegree = user->polydegree;
   //initialize finite element space (fe)
   ierr = FESetup(fe);CHKERRQ(ierr);
+
 
   //Create a dmplex from Exodus-II file
   ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm);CHKERRQ(ierr);
@@ -145,42 +152,99 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 
   //in hierarchy of interpolated mesh topology, get all the cells (elements). (Height 0)
   ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
-  sz_conn = sz_perm_idx*(cEnd-cStart);
-  ierr = PetscMalloc1(sz_conn, &conn); CHKERRQ(ierr);
-  //for each element
+  numCells = cEnd-cStart;
+  PetscInt numPad = ne - (numCells % ne);
+  ierr = PetscPrintf(PETSC_COMM_SELF,"numPad %d:  \n",numPad);CHKERRQ(ierr);
+  sz_conn = sz_perm_idx*(numCells+numPad);
+  //sz_conn = sz_perm_idx*(numCells);
+  ierr = PetscCalloc1(sz_conn, &tmp_conn); CHKERRQ(ierr);
+  for(i = 0 ; i < sz_conn; i++){
+    ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
+  }
 
+
+  //for each element
   for(i = cStart ; i <cEnd; i++)
   {
      points=NULL;
      //get the TransitiveClosure of each element
      ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
+     ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
      PetscInt k =0;
      for(j = 0; j < numPoints ; j++){
+       ierr = PetscPrintf(PETSC_COMM_SELF,"points[%d]: %d \n",j,points[2*j]);CHKERRQ(ierr);
          PetscInt tmpdof;
          PetscSectionGetDof(section, points[2*j], &tmpdof);
-         if (!tmpdof) continue;
+         if (!tmpdof)  continue;
+
          //permute the TransitiveClosure of each elemet according to perm_idx
-         conn[numPoints*i+k] = points[2*perm_idx[k]];
-         k=k+1;
+         if(numPoints == 9){
+            numPoints--;
+            tmp_conn[numPoints*i+k] = points[2*perm_idx[k]];
+            numPoints++;
+          }
+          else{
+          ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+            tmp_conn[numPoints*i+k] = points[2*perm_idx[k]];
+          }
+         k++;
      }
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
   }
 
-    //set the connectivity (conn) to user->conn
-     user->conn = conn;
+
+
+  //pad tmp_conn
+  if(numPad){
+    PetscInt startPad_idx, endPad_idx;
+
+    //start to end indecies to populate with the last elements of tmp_conn
+    startPad_idx = sz_perm_idx *  numCells;
+    endPad_idx = sz_conn;  //NOTE: sz_conn is 1 more that the endPad_idx. So use < instead of <=
+    ierr = PetscPrintf(PETSC_COMM_SELF,"startPad_idx %d \n",startPad_idx);CHKERRQ(ierr);
+    //get the last elemnt reordered TransitiveClosure.
+    for(i = startPad_idx; i <  endPad_idx; i++){
+      tmp_conn[i] = tmp_conn[i - sz_perm_idx];
+    }
+
+  }
+
+  //Allocate memory for conn
+  ierr = PetscCalloc1(sz_conn, &conn); CHKERRQ(ierr);
+  //permute tmp_conn to have it in structured by the number of elements. Store permutation in conn
+  PetscInt m = 0;
+  for(k = 0; k < sz_conn/(ne*sz_perm_idx);k++){
+    for(j = 0; j< sz_perm_idx; j++){
+      for(i = 0; i < ne; i++){
+        conn[m] = tmp_conn[i*sz_perm_idx+j+k*(ne*sz_perm_idx)];
+        m++;
+      }
+    }
+  }
+
+  //set the tmp_connectivity (tmp_conn) to user->tmp_conn
+  user->conn = conn;
+
+  // set FE and user to dm
+  ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
+  ierr = DMSetApplicationContext(*dm, &user);CHKERRQ(ierr);
 
 
 
-
-    /*
      ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
+     for(i=0; i < sz_conn; i++){
+       ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d \n",i,tmp_conn[i]);CHKERRQ(ierr);
+     }
+
+     ierr = PetscPrintf(PETSC_COMM_SELF,"\n\n\n----------------\n\n\n");CHKERRQ(ierr);
      for(i=0; i < sz_conn; i++){
        ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d \n",i,conn[i]);CHKERRQ(ierr);
      }
-    */
+
+
 
   //Destroy PetscSection
-	PetscSectionDestroy(&section);
+	ierr = PetscSectionDestroy(&section);CHKERRQ(ierr);
 
 	PetscFunctionReturn(0);
 }
@@ -303,7 +367,7 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
     //
     //   for(i = 0 ; i<sz_X ; i++){
     //     arr[i] = i;
-    //     x[user->conn[i]] += arr[i];
+    //     x[user->tmp_conn[i]] += arr[i];
     //   }
     //
     //   ierr = VecRestoreArray(X,&x);CHKERRQ(ierr);
