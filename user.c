@@ -154,14 +154,9 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
   numCells = cEnd-cStart;
   PetscInt numPad = ne - (numCells % ne);
-  ierr = PetscPrintf(PETSC_COMM_SELF,"numPad %d:  \n",numPad);CHKERRQ(ierr);
-  sz_conn = sz_perm_idx*(numCells+numPad);
-  //sz_conn = sz_perm_idx*(numCells);
-  ierr = PetscCalloc1(sz_conn, &tmp_conn); CHKERRQ(ierr);
-  for(i = 0 ; i < sz_conn; i++){
-    ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
-  }
 
+  sz_conn = sz_perm_idx*(numCells+numPad);
+  ierr = PetscCalloc1(sz_conn, &tmp_conn); CHKERRQ(ierr);
 
   //for each element
   for(i = cStart ; i <cEnd; i++)
@@ -169,24 +164,16 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
      points=NULL;
      //get the TransitiveClosure of each element
      ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
-     ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+     //ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
      PetscInt k =0;
      for(j = 0; j < numPoints ; j++){
-       ierr = PetscPrintf(PETSC_COMM_SELF,"points[%d]: %d \n",j,points[2*j]);CHKERRQ(ierr);
          PetscInt tmpdof;
+
          PetscSectionGetDof(section, points[2*j], &tmpdof);
          if (!tmpdof)  continue;
 
          //permute the TransitiveClosure of each elemet according to perm_idx
-         if(numPoints == 9){
-            numPoints--;
-            tmp_conn[numPoints*i+k] = points[2*perm_idx[k]];
-            numPoints++;
-          }
-          else{
-          ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
-            tmp_conn[numPoints*i+k] = points[2*perm_idx[k]];
-          }
+         tmp_conn[sz_perm_idx*i+k] = points[2*perm_idx[k]];
          k++;
      }
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
@@ -194,15 +181,15 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 
 
 
-  //pad tmp_conn
+  //pad tmp_conn with the last element
   if(numPad){
     PetscInt startPad_idx, endPad_idx;
 
     //start to end indecies to populate with the last elements of tmp_conn
     startPad_idx = sz_perm_idx *  numCells;
     endPad_idx = sz_conn;  //NOTE: sz_conn is 1 more that the endPad_idx. So use < instead of <=
-    ierr = PetscPrintf(PETSC_COMM_SELF,"startPad_idx %d \n",startPad_idx);CHKERRQ(ierr);
-    //get the last elemnt reordered TransitiveClosure.
+
+    //get the last element reordered in TransitiveClosure.
     for(i = startPad_idx; i <  endPad_idx; i++){
       tmp_conn[i] = tmp_conn[i - sz_perm_idx];
     }
@@ -231,20 +218,21 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 
 
 
-     ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
-     for(i=0; i < sz_conn; i++){
-       ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d \n",i,tmp_conn[i]);CHKERRQ(ierr);
-     }
-
-     ierr = PetscPrintf(PETSC_COMM_SELF,"\n\n\n----------------\n\n\n");CHKERRQ(ierr);
-     for(i=0; i < sz_conn; i++){
-       ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d \n",i,conn[i]);CHKERRQ(ierr);
-     }
+    //  ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
+    //  for(i=0; i < sz_conn; i++){
+    //    ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d \n",i,tmp_conn[i]);CHKERRQ(ierr);
+    //  }
+     //
+    //  ierr = PetscPrintf(PETSC_COMM_SELF,"\n\n\n----------------\n\n\n");CHKERRQ(ierr);
+    //  for(i=0; i < sz_conn; i++){
+    //    ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d \n",i,conn[i]);CHKERRQ(ierr);
+    //  }
 
 
 
   //Destroy PetscSection
 	ierr = PetscSectionDestroy(&section);CHKERRQ(ierr);
+  ierr = PetscFree(tmp_conn);CHKERRQ(ierr);
 
 	PetscFunctionReturn(0);
 }
@@ -253,17 +241,20 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 #define __FUNCT__ "drawOneElem"
 PetscErrorCode drawOneElem(DM dm, AppCtx *user){
 
-  PetscInt vStart,vEnd,    //vertices
-           eStart,eEnd,    //edges
-           fStart, fEnd,   //faces
-           cStart,cEnd,    //cells (elements)
-           rank,
-           i,j,
-           numPoints,      //number of points in TransitiveClosure
-           *points;        //array of points in TransitiveClosure
+  PetscInt       vStart,vEnd,    //vertices
+                 eStart,eEnd,    //edges
+                 fStart, fEnd,   //faces
+                 cStart,cEnd,    //cells (elements)
+                 rank,
+                 i,j,
+                 numPoints,      //number of points in TransitiveClosure
+                 *points;        //array of points in TransitiveClosure
   PetscInt const *myCone;
   PetscErrorCode ierr;
-  PetscBool interpolated = user->interpolate;
+  PetscBool      interpolated = user->interpolate;
+  PetscScalar    *coordsArray;  //placehoder array for coordinates as a vector
+  Vec            coords;        //coordiantes from DMGetCoordinate
+  DM             dmc;           //For coordinates from DMGetCoordinateDM
 
 
 
@@ -347,6 +338,25 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
         }
           ierr = DMPlexRestoreTransitiveClosure(dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
+
+
+    ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"\n\n\n");CHKERRQ(ierr);
+
+    //Show Coordinates
+    ierr = DMGetCoordinates(dm, &coords);CHKERRQ(ierr);
+    ierr = DMGetCoordinateDM(dm, &dmc);CHKERRQ(ierr);
+    ierr = VecGetArray(coords, &coordsArray);CHKERRQ(ierr);
+
+    for(i = vStart; i<vEnd; i++)
+    {
+      PetscScalar *cp;  //cp =[x,y,z]
+      ierr = DMPlexPointLocalRead(dmc,i,coordsArray,&cp);CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_SELF,"coords %d:  [%f, %f,  %f]\n",i-vStart,cp[0],cp[1],cp[2]);CHKERRQ(ierr);
+    }
+
+    ierr = VecRestoreArray(coords, &coordsArray); CHKERRQ(ierr);
+
+
 
     // NOTE 2: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
     //      that it creates is faulty as the source code requires a PetscDS while we don't have it.
