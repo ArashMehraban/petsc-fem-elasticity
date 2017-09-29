@@ -40,22 +40,23 @@ PetscErrorCode computeExact(DM dm, Vec sol)
             i, vStart,vEnd;
   PetscErrorCode ierr;
   Vec coords;
+  DM dmc;
 
   PetscFunctionBeginUser;
 
   ierr = VecSet(sol,0);CHKERRQ(ierr);
   ierr = DMGetCoordinates(dm, &coords);CHKERRQ(ierr);
-  //ierr = VecView(coords, PETSC_VIEWER_STDOUT_WORLD 	);CHKERRQ(ierr);
+  ierr = DMGetCoordinateDM(dm, &dmc);CHKERRQ(ierr);
   ierr = VecGetArray(sol, &solArray);CHKERRQ(ierr);
   ierr = VecGetArray(coords, &coordsArray);CHKERRQ(ierr);
   ierr = DMPlexGetDepthStratum(dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
 
   for(i = vStart; i<vEnd; i++)
   {
-    PetscReal *xp, *cp;
+    PetscReal *xp, *cp;  //xp =[u1,u2,u3] and cp =[x,y,z]
     ierr = DMPlexPointLocalRef(dm,i,solArray,&xp);CHKERRQ(ierr);
-    ierr = DMPlexPointLocalRead(dm,i,coordsArray,&cp);CHKERRQ(ierr);
-    //ierr = PetscPrintf(PETSC_COMM_SELF,"coords %d:  [%f, %f,  %f]\n",i,cp[0],cp[1],cp[2]);CHKERRQ(ierr);
+    ierr = DMPlexPointLocalRead(dmc,i,coordsArray,&cp);CHKERRQ(ierr);
+    //ierr = PetscPrintf(PETSC_COMM_SELF,"coords %d:  [%f, %f,  %f]\n",i-vStart,cp[0],cp[1],cp[2]);CHKERRQ(ierr);
     ierr = givenSol(xp, cp);CHKERRQ(ierr);
   }
 
