@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 
   ierr = processUserOptions(PETSC_COMM_WORLD, &user);CHKERRQ(ierr);
   ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
-  ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
+  //ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
   ierr = DMSetApplicationContext(dm, &user);CHKERRQ(ierr);
 
   ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
