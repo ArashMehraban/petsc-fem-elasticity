@@ -154,6 +154,7 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
   numCells = cEnd-cStart;
   PetscInt numPad = ne - (numCells % ne);
+  ierr = PetscPrintf(PETSC_COMM_SELF,"numCells: %d\n",numCells);CHKERRQ(ierr);
 
   sz_conn = sz_perm_idx*(numCells+numPad);
   ierr = PetscCalloc1(sz_conn, &tmp_conn); CHKERRQ(ierr);
@@ -211,22 +212,12 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 
   //set the tmp_connectivity (tmp_conn) to user->tmp_conn
   user->conn = conn;
+  user->sz_conn = sz_conn;
+  user->sz_perm_idx = sz_perm_idx;
 
   // set FE and user to dm
   ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
   ierr = DMSetApplicationContext(*dm, &user);CHKERRQ(ierr);
-
-
-
-    //  ierr = PetscPrintf(PETSC_COMM_SELF,"sz_conn %d:  \n",sz_conn);CHKERRQ(ierr);
-    //  for(i=0; i < sz_conn; i++){
-    //    ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d \n",i,tmp_conn[i]);CHKERRQ(ierr);
-    //  }
-     //
-    //  ierr = PetscPrintf(PETSC_COMM_SELF,"\n\n\n----------------\n\n\n");CHKERRQ(ierr);
-    //  for(i=0; i < sz_conn; i++){
-    //    ierr = PetscPrintf(PETSC_COMM_SELF,"conn[%d]: %d \n",i,conn[i]);CHKERRQ(ierr);
-    //  }
 
 
 
@@ -331,8 +322,8 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
         //get the TransitiveClosure of each element
         ierr = DMPlexGetTransitiveClosure(dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
         ierr = PetscPrintf(PETSC_COMM_SELF,"\nnumber of points in TransitiveClosure:  %d\n", numPoints);CHKERRQ(ierr);
-        ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"TransitiveClosure ordering\n");CHKERRQ(ierr);
-        ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"----------------------------\n");CHKERRQ(ierr);
+        ierr = PetscPrintf(PETSC_COMM_SELF,"TransitiveClosure ordering\n");CHKERRQ(ierr);
+        ierr = PetscPrintf(PETSC_COMM_SELF,"----------------------------\n");CHKERRQ(ierr);
         for(j = 0; j < numPoints ; j++){
           ierr = PetscPrintf(PETSC_COMM_SELF,"%d--> %d\n", j, points[2*j]);CHKERRQ(ierr);
         }
@@ -340,7 +331,8 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
     }
 
 
-    ierr = PetscSynchronizedPrintf(PETSC_COMM_SELF,"\n\n\n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\n\n\n");CHKERRQ(ierr);
+
 
     //Show Coordinates
     ierr = DMGetCoordinates(dm, &coords);CHKERRQ(ierr);
@@ -392,4 +384,52 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
     // }
 
       PetscFunctionReturn(0);
+}
+
+
+#undef __FUNCT__
+#define __FUNCT__ "dmExtractElems"
+PetscErrorCode dmExtractElems(DM dm, PetscScalar *u, PetscInt sz_u, PetscInt elem, PetscInt ne, PetscScalar *y)
+{
+  // PetscErrorCode ierr;
+  // FE             fe;
+  // PetscInt       P,fedegree,e, numElem;
+  // AppCtx        *user;
+
+
+  PetscFunctionBeginUser;
+
+  // ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
+  // fedegree = fe->polydegree;
+  //
+  // PetscPrintf(PETSC_COMM_SELF, "fedegree: %d", fedegree);
+  //
+  // P = fedegree + 1;
+
+  // ierr = DMGetApplicationContext(dm,&user);CHKERRQ(ierr);
+  // PetscInt numNodesInElem = user->sz_perm_idx;
+  // numElem = user->sz_conn / numNodesInElem;
+
+  //pad the *u to be multiple of ne
+
+
+  //y=NULL;
+
+
+  //
+  // for (e=elem; e<elem+ne; e++) {
+  //   for (d=0; d < user->dof; d++) {
+  //       for (ii=0; ii<P; ii++) {
+  //         for (jj=0; jj<P; jj++) {
+  //           for (kk=0; kk<P; kk++) {
+  //             y[(((d*P+ii)*P+jj)*P+kk)*ne+(e-elem)] = u[];
+  //           }
+  //         }
+  //       }
+  //     }
+  //
+  // }
+
+
+  PetscFunctionReturn(0);
 }
