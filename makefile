@@ -11,7 +11,7 @@ all: main
 
 main: main.o fe.o user.o exact.o chkopts
 	-${CLINKER} -o main main.o fe.o user.o exact.o ${PETSC_KSP_LIB} ${PETSC_LIB} ${PETSC_SNES_LIB}
-	${RM} main.o fe.o user.o
+	${RM} main.o fe.o user.o exact.o
 
 
 
