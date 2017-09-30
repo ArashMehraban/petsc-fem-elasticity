@@ -23,9 +23,9 @@ PetscErrorCode givenSol(PetscReal xp[], PetscReal cp[])
      xp[1] = PetscExpReal(3*cp[1])*PetscSinReal(4*cp[2])*PetscCosReal(2*cp[0]);
      xp[2] = PetscExpReal(4*cp[2])*PetscSinReal(2*cp[0])*PetscCosReal(3*cp[1]); */
 
-     xp[0] = cp[0]*cp[1]*cp[2];
-     xp[1] = cp[0]*cp[1]*cp[2];
-     xp[2] = cp[0]*cp[1]*cp[2];
+    //  xp[0] = cp[0]*cp[1]*cp[2];
+    //  xp[1] = cp[0]*cp[1]*cp[2];
+    //  xp[2] = cp[0]*cp[1]*cp[2];
 
      PetscFunctionReturn(0);
 }
@@ -35,7 +35,7 @@ PetscErrorCode givenSol(PetscReal xp[], PetscReal cp[])
 #define __FUNCT__ "computeExact"
 PetscErrorCode computeExact(DM dm, Vec sol)
 {
-  PetscReal *solArray, *coordsArray;
+  PetscScalar *solArray, *coordsArray;
   PetscInt  //pStart, pEnd,
             i, vStart,vEnd;
   PetscErrorCode ierr;
