@@ -38,9 +38,19 @@ int main(int argc, char **argv)
   ierr = dmMeshSetup(PETSC_COMM_WORLD, &user, &dm);CHKERRQ(ierr);
   //ierr = drawOneElem(dm,&user);CHKERRQ(ierr);
 
+  ierr = createFE(user, &fe);CHKERRQ(ierr);
+  // for( i=0; i<4; i++)
+  //     PetscPrintf(PETSC_COMM_SELF,"B[%d]: %f\n",i,fe->ref.B[i]);
+  // for(i=0; i<4; i++)
+  //     PetscPrintf(PETSC_COMM_SELF,"D[%d]: %f\n",i,fe->ref.D[i]);
+  ierr = DMSetApplicationContext(dm, fe);CHKERRQ(ierr);
+  // ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
+  // ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
 
-  ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
+  // for(i=0; i<4; i++)
+  //     PetscPrintf(PETSC_COMM_SELF,"B[%d]: %f\n",i,fe->ref.B[i]);
+  // for(i=0; i<4; i++)
+  //     PetscPrintf(PETSC_COMM_SELF,"D[%d]: %f\n",i,fe->ref.D[i]);
 
   ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
 
@@ -53,11 +63,11 @@ int main(int argc, char **argv)
   ierr = VecGetLocalSize(Ul,&sz_Ul);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Ul,&u);CHKERRQ(ierr);
   //VecGetLocalSize(Ul,&sz_Ul);
-     //ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
+     ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
   //VecView(Ul,PETSC_VIEWER_STDOUT_SELF);
 
-  // PetscScalar *ue;
-  // ierr = dmExtractElems(dm, u, sz_Ul, 1, 4, ue);CHKERRQ(ierr);
+  PetscScalar *ue;
+  ierr = dmExtractElems(dm, u, sz_Ul, 1, 4, ue);CHKERRQ(ierr);
 
   ierr = VecDestroy(&exactSol);CHKERRQ(ierr);
   ierr = VecDestroy(&Ul);CHKERRQ(ierr);
