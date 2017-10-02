@@ -68,16 +68,10 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
                  perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
                  //perm8_idx[]  = {1,0,2,3,5,4,6,7}
                  perm8_idx[]  = {2,1,3,4,6,5,7,8};
-  FE             fe;
+//  FE             fe;
 
 
 	PetscFunctionBeginUser;
-
-  ierr = PetscNew(&fe);CHKERRQ(ierr);
-  fe->polydegree = user->polydegree;
-  //initialize finite element space (fe)
-  ierr = FESetup(fe);CHKERRQ(ierr);
-
 
   //Create a dmplex from Exodus-II file
   ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm);CHKERRQ(ierr);
@@ -215,9 +209,9 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   user->sz_conn = sz_conn;
   user->sz_perm_idx = sz_perm_idx;
 
-  // set FE and user to dm
-  ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
-  ierr = DMSetApplicationContext(*dm, &user);CHKERRQ(ierr);
+  // // set FE and user to dm
+  // ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
+  // ierr = DMSetApplicationContext(*dm, &user);CHKERRQ(ierr);
 
 
 
@@ -226,6 +220,25 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
   ierr = PetscFree(tmp_conn);CHKERRQ(ierr);
 
 	PetscFunctionReturn(0);
+}
+
+#undef __FUNCT__
+#define __FUNCT__ "createFE"
+PetscErrorCode createFE(AppCtx user, FE *fe){
+
+  PetscErrorCode ierr;
+  FE    fePtr;
+
+   PetscFunctionBeginUser;
+
+    ierr = PetscNew(&fePtr);CHKERRQ(ierr);
+    fePtr->polydegree = user.polydegree;
+    fePtr->dof = user.dof;
+    //initialize finite element space (fe)
+    ierr = FESetup(fePtr);CHKERRQ(ierr);
+    *fe = fePtr;
+
+  PetscFunctionReturn(0);
 }
 
 #undef __FUNCT__
@@ -391,20 +404,19 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
 #define __FUNCT__ "dmExtractElems"
 PetscErrorCode dmExtractElems(DM dm, PetscScalar *u, PetscInt sz_u, PetscInt elem, PetscInt ne, PetscScalar *y)
 {
-  // PetscErrorCode ierr;
-  // FE             fe;
-  // PetscInt       P,fedegree,e, numElem;
-  // AppCtx        *user;
+  PetscErrorCode ierr;
+  FE             fe;
+  PetscInt       P,fedegree, dof,e, numElem;
+  AppCtx        *user;
 
 
   PetscFunctionBeginUser;
 
-  // ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
-  // fedegree = fe->polydegree;
-  //
-  // PetscPrintf(PETSC_COMM_SELF, "fedegree: %d", fedegree);
-  //
-  // P = fedegree + 1;
+   ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
+
+
+
+  // P = fe->polydegree + 1;
 
   // ierr = DMGetApplicationContext(dm,&user);CHKERRQ(ierr);
   // PetscInt numNodesInElem = user->sz_perm_idx;
@@ -418,7 +430,7 @@ PetscErrorCode dmExtractElems(DM dm, PetscScalar *u, PetscInt sz_u, PetscInt ele
 
   //
   // for (e=elem; e<elem+ne; e++) {
-  //   for (d=0; d < user->dof; d++) {
+  //   for (d=0; d < fe->dof; d++) {
   //       for (ii=0; ii<P; ii++) {
   //         for (jj=0; jj<P; jj++) {
   //           for (kk=0; kk<P; kk++) {
