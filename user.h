@@ -23,6 +23,7 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm);
 /* Use this function after calling dmMeshSetup.
    It is best to use this function with one element to see its connectivity */
 PetscErrorCode drawOneElem(DM dm,AppCtx *user);
+PetscErrorCode createFE(AppCtx user, FE *fe);
 PetscErrorCode dmExtractElems(DM dm, PetscScalar *u, PetscInt sz_u, PetscInt elem, PetscInt ne, PetscScalar *y);
 
 #endif //end of __USER__H
