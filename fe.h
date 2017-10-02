@@ -11,6 +11,7 @@
 {
   MPI_Comm comm;
   PetscInt polydegree; //Finite Element polynomial degree
+  PetscInt dof;        //degrees of freedom at each node
   struct{
     PetscReal *B;
     PetscReal *D;
@@ -22,6 +23,5 @@
 
 PetscErrorCode FEbasisEval(FE fe, PetscReal q, PetscReal B[], PetscReal D[]);
 PetscErrorCode FESetup(FE fe);
-
 
 #endif //end of __FE__H
