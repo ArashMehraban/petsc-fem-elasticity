@@ -43,23 +43,23 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "dmMeshSetup"
-PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
+#define __FUNCT__ "dmCreate"
+PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
 {
   PetscInt       pStart, pEnd,   //all points (nodes) in mesh
                  cStart,cEnd,    //cells (elements)
                  numCells,       //number of cell for the current processor
                  vStart,vEnd,    //vertices
-                 dim,
+                 //dim,
 	               i,j,k,
                  numPoints,      //number of points in TransitiveClosure
                  *points;        //array of points in TransitiveClosure
-	const char     *filename    = user->filename;
-	PetscBool      interpolate  = user->interpolate;
-	PetscInt       dof          = user->dof;
-  PetscInt       ne           = user->ne;
+	const char     *filename    = user.filename;
+	PetscBool      interpolate  = user.interpolate;
+	PetscInt       dof          = user.dof;
+  PetscInt       ne           = user.ne;
 	PetscErrorCode ierr;
-	Vec            coords;
+	//Vec            coords;
 	DM distributedMesh = NULL;
   PetscSection   section;
   PetscInt       *conn, *tmp_conn, sz_conn;
@@ -68,7 +68,7 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
                  perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
                  //perm8_idx[]  = {1,0,2,3,5,4,6,7}
                  perm8_idx[]  = {2,1,3,4,6,5,7,8};
-//  FE             fe;
+ FE             fe;
 
 
 	PetscFunctionBeginUser;
@@ -93,10 +93,10 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 		*dm  = distributedMesh;
 	}
 
-  //Set the Coordiantes for dmplex
-  ierr = DMGetCoordinates(*dm, &coords);CHKERRQ(ierr);
-  //Set the dimension for dmplex
-  ierr = DMGetDimension(*dm, &dim);CHKERRQ(ierr);
+  // //Set the Coordiantes for dmplex
+  // ierr = DMGetCoordinates(*dm, &coords);CHKERRQ(ierr);
+  // //Set the dimension for dmplex
+  // ierr = DMGetDimension(*dm, &dim);CHKERRQ(ierr);
 
 
 	//Initialize petsc section
@@ -204,10 +204,28 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
     }
   }
 
-  //set the tmp_connectivity (tmp_conn) to user->tmp_conn
-  user->conn = conn;
-  user->sz_conn = sz_conn;
-  user->sz_perm_idx = sz_perm_idx;
+  //setup FE
+  ierr = PetscNew(&fe);CHKERRQ(ierr);
+  fe->polydegree = user.polydegree;
+  fe->dof = user.dof;
+  //initialize finite element space (fe)
+  ierr = FESetup(fe);CHKERRQ(ierr);
+  //set the connectivity to fe
+  fe->conn = conn;
+  fe->sz_conn = sz_conn;
+  fe->sz_perm_idx = sz_perm_idx;
+  // *fe = fePtr;
+
+  // for(i=0; i < 4 ; i++)
+  //     PetscPrintf(PETSC_COMM_SELF, "B[%d]: %f\n" , i, fe->ref.B[i]);
+  //
+  //     for(i=0; i < 4 ; i++)
+  //         PetscPrintf(PETSC_COMM_SELF, "D[%d]: %f\n" , i, fe->ref.D[i]);
+  //
+  //         for(i=0; i < sz_conn ; i++)
+  //             PetscPrintf(PETSC_COMM_SELF, "conn[%d]: %d\n" , i, fe->conn[i]);
+
+   ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
 
   // // set FE and user to dm
   // ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
@@ -223,27 +241,8 @@ PetscErrorCode dmMeshSetup(MPI_Comm comm, AppCtx *user, DM *dm)
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "createFE"
-PetscErrorCode createFE(AppCtx user, FE *fe){
-
-  PetscErrorCode ierr;
-  FE    fePtr;
-
-   PetscFunctionBeginUser;
-
-    ierr = PetscNew(&fePtr);CHKERRQ(ierr);
-    fePtr->polydegree = user.polydegree;
-    fePtr->dof = user.dof;
-    //initialize finite element space (fe)
-    ierr = FESetup(fePtr);CHKERRQ(ierr);
-    *fe = fePtr;
-
-  PetscFunctionReturn(0);
-}
-
-#undef __FUNCT__
 #define __FUNCT__ "drawOneElem"
-PetscErrorCode drawOneElem(DM dm, AppCtx *user){
+PetscErrorCode drawOneElem(DM dm, AppCtx user){
 
   PetscInt       vStart,vEnd,    //vertices
                  eStart,eEnd,    //edges
@@ -255,7 +254,7 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
                  *points;        //array of points in TransitiveClosure
   PetscInt const *myCone;
   PetscErrorCode ierr;
-  PetscBool      interpolated = user->interpolate;
+  PetscBool      interpolated = user.interpolate;
   PetscScalar    *coordsArray;  //placehoder array for coordinates as a vector
   Vec            coords;        //coordiantes from DMGetCoordinate
   DM             dmc;           //For coordinates from DMGetCoordinateDM
@@ -361,87 +360,35 @@ PetscErrorCode drawOneElem(DM dm, AppCtx *user){
 
     ierr = VecRestoreArray(coords, &coordsArray); CHKERRQ(ierr);
 
-
-
-    // NOTE 2: The code contained in the following braces {} was supposed to createa .vtu file. However, the .vtu file
-    //      that it creates is faulty as the source code requires a PetscDS while we don't have it.
-    // NOTE 1 : Works with 1 dof only
-    // {
-    //   PetscViewer view;
-    //   Vec X;
-    //   PetscScalar *x, *arr;
-    //   PetscInt sz_X;
-    //
-    //   ierr = DMCreateGlobalVector(dm,&X);CHKERRQ(ierr);
-    //
-    //   ierr = VecGetArray(X, &x);CHKERRQ(ierr);
-    //   ierr = VecGetSize(X, &sz_X); CHKERRQ(ierr);
-    //   ierr = PetscMalloc1(sz_X,&arr);CHKERRQ(ierr);
-    //
-    //   // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-    //
-    //   for(i = 0 ; i<sz_X ; i++){
-    //     arr[i] = i;
-    //     x[user->tmp_conn[i]] += arr[i];
-    //   }
-    //
-    //   ierr = VecRestoreArray(X,&x);CHKERRQ(ierr);
-    //   ierr = PetscViewerCreate(PETSC_COMM_SELF,&view);CHKERRQ(ierr);
-    //   ierr = PetscViewerSetType(view, PETSCVIEWERVTK);CHKERRQ(ierr);
-    //   ierr = PetscViewerFileSetName(view, "elem.vtu");CHKERRQ(ierr);
-    //   ierr = VecView(X, view);CHKERRQ(ierr);
-    //   //ierr = VecView(X, PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-    //   ierr = PetscViewerDestroy(&view);CHKERRQ(ierr);
-    //   ierr = PetscFree(x);CHKERRQ(ierr);
-    //   ierr = PetscFree(arr);CHKERRQ(ierr);
-    // }
-
       PetscFunctionReturn(0);
 }
 
 
 #undef __FUNCT__
 #define __FUNCT__ "dmExtractElems"
-PetscErrorCode dmExtractElems(DM dm, PetscScalar *u, PetscInt sz_u, PetscInt elem, PetscInt ne, PetscScalar *y)
-{
+PetscErrorCode dmExtractElems(DM dm, const PetscScalar *u, PetscInt elem, PetscInt ne, PetscScalar *y)
+{                                                //u is a vecArray (read-only) passed to this function
   PetscErrorCode ierr;
   FE             fe;
-  PetscInt       P,fedegree, dof,e, numElem;
-  AppCtx        *user;
-
+  PetscInt       e, d, k, //for loop counters
+                 elemStart, elemEnd;
 
   PetscFunctionBeginUser;
 
-   ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
+  ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
 
+  elemStart = fe->sz_perm_idx*elem;
+  elemEnd = fe->sz_perm_idx*(elem+ne);
 
-
-  // P = fe->polydegree + 1;
-
-  // ierr = DMGetApplicationContext(dm,&user);CHKERRQ(ierr);
-  // PetscInt numNodesInElem = user->sz_perm_idx;
-  // numElem = user->sz_conn / numNodesInElem;
-
-  //pad the *u to be multiple of ne
-
-
-  //y=NULL;
-
-
-  //
-  // for (e=elem; e<elem+ne; e++) {
-  //   for (d=0; d < fe->dof; d++) {
-  //       for (ii=0; ii<P; ii++) {
-  //         for (jj=0; jj<P; jj++) {
-  //           for (kk=0; kk<P; kk++) {
-  //             y[(((d*P+ii)*P+jj)*P+kk)*ne+(e-elem)] = u[];
-  //           }
-  //         }
-  //       }
-  //     }
-  //
-  // }
-
+  for(e = elemStart; e<elemEnd; e++){
+    PetscScalar *u_dof;
+    ierr = DMPlexPointLocalRead(dm, fe->conn[e], u, &u_dof); CHKERRQ(ierr);
+    k=0;
+    for(d = 0 ; d < fe->dof; d++){
+      y[d*(ne*fe->sz_perm_idx)+k] = u_dof[d];
+      k++;
+    }
+  }
 
   PetscFunctionReturn(0);
 }
