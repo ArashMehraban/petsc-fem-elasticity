@@ -12,6 +12,9 @@
   MPI_Comm comm;
   PetscInt polydegree; //Finite Element polynomial degree
   PetscInt dof;        //degrees of freedom at each node
+  PetscInt      *conn;
+  PetscInt      sz_conn;
+  PetscInt      sz_perm_idx;
   struct{
     PetscReal *B;
     PetscReal *D;
