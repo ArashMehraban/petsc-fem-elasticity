@@ -53,7 +53,7 @@ PetscErrorCode computeExact(DM dm, Vec sol)
 
   for(i = vStart; i<vEnd; i++)
   {
-    PetscReal *xp, *cp;  //xp =[u1,u2,u3] and cp =[x,y,z]
+    PetscScalar *xp, *cp;  //xp =[u1,u2,u3] and cp =[x,y,z]
     ierr = DMPlexPointLocalRef(dm,i,solArray,&xp);CHKERRQ(ierr);
     ierr = DMPlexPointLocalRead(dmc,i,coordsArray,&cp);CHKERRQ(ierr);
     //ierr = PetscPrintf(PETSC_COMM_SELF,"coords %d:  [%f, %f,  %f]\n",i-vStart,cp[0],cp[1],cp[2]);CHKERRQ(ierr);
