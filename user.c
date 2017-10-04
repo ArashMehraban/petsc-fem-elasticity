@@ -66,8 +66,8 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
   PetscInt       *perm_idx,         //permutation array index for local ordering
                  sz_perm_idx=0,     //size of permutation array index
                  perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
-                 //perm8_idx[]  = {1,0,2,3,5,4,6,7}
-                 perm8_idx[]  = {2,1,3,4,6,5,7,8};
+                 perm8_idx[]  = {1,0,2,3,5,4,6,7};
+                 //perm8_idx[]  = {2,1,3,4,6,5,7,8};
  FE             fe;
 
 
@@ -160,17 +160,19 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
      //get the TransitiveClosure of each element
      ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
      //ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+     PetscInt tmpOffset[27];
      PetscInt k =0;
      for(j = 0; j < numPoints ; j++){
          PetscInt tmpdof;
 
          PetscSectionGetDof(section, points[2*j], &tmpdof);
          if (!tmpdof)  continue;
-
+         PetscSectionGetOffset(section, points[2*j], &tmpOffset[k++]);
+       }
+       for(j=0; j<k; j++){
          //permute the TransitiveClosure of each elemet according to perm_idx
-         tmp_conn[sz_perm_idx*i+k] = points[2*perm_idx[k]];
-         k++;
-     }
+         tmp_conn[sz_perm_idx*i+j] = tmpOffset[perm_idx[j]];
+       }
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
   }
 
@@ -370,7 +372,7 @@ PetscErrorCode dmExtractElems(DM dm, const PetscScalar *u, PetscInt elem, PetscI
 {                                                //u is a vecArray (read-only) passed to this function
   PetscErrorCode ierr;
   FE             fe;
-  PetscInt       e, d, k, //for loop counters
+  PetscInt       i, d, //for loop counters
                  elemStart, elemEnd;
 
   PetscFunctionBeginUser;
@@ -380,13 +382,13 @@ PetscErrorCode dmExtractElems(DM dm, const PetscScalar *u, PetscInt elem, PetscI
   elemStart = fe->sz_perm_idx*elem;
   elemEnd = fe->sz_perm_idx*(elem+ne);
 
-  for(e = elemStart; e<elemEnd; e++){
-    PetscScalar *u_dof;
-    ierr = DMPlexPointLocalRead(dm, fe->conn[e], u, &u_dof); CHKERRQ(ierr);
-    k=0;
+  for(i = elemStart; i<elemEnd; i++){
+    const PetscScalar *u_dof;
+    // ierr = DMPlexPointLocalRead(dm, fe->conn[e], u, &u_dof); CHKERRQ(ierr);
+    u_dof = &u[fe->dof*fe->conn[i]];
+
     for(d = 0 ; d < fe->dof; d++){
-      y[d*(ne*fe->sz_perm_idx)+k] = u_dof[d];
-      k++;
+      y[d*(ne*fe->sz_perm_idx)+i-elemStart] = u_dof[d];
     }
   }
 
