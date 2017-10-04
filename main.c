@@ -25,7 +25,7 @@ int main(int argc, char **argv)
   PetscErrorCode    ierr;
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
-  Vec               exactSol, Ul; //res
+  Vec               exactSol, Ul, dmx ,X; //res
   FE                fe;
   PetscInt          sz_Ul,e;
   const PetscScalar *u;
@@ -39,18 +39,21 @@ int main(int argc, char **argv)
   //ierr = drawOneElem(dm,user);CHKERRQ(ierr);
 
    ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
+   ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
+   ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
 
-  ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
+  //ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
 
-  ierr = computeExact(dm, exactSol);
+  //ierr = computeExact(dm, exactSol);
   //VecView(exactSol,PETSC_VIEWER_STDOUT_WORLD);
 
   //ierr = DMCreateGlobalVector(dm, &res);CHKERRQ(ierr);
 
   ierr = DMGetLocalVector(dm,&Ul);CHKERRQ(ierr);
   ierr = VecGetLocalSize(Ul,&sz_Ul);CHKERRQ(ierr);
+  //NOTE: Must populate local vector Ul from Glodbal Vector U
+  // ierr = DMGlobalToLocalBegin(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
+  // ierr = DMGlobalToLocalEnd(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Ul,&u);CHKERRQ(ierr);
   //VecGetLocalSize(Ul,&sz_Ul);
   ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
@@ -60,6 +63,13 @@ int main(int argc, char **argv)
     ierr = dmExtractElems(dm, u, e, user.ne, ue);CHKERRQ(ierr);
   }
   ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
+
+  // ierr= DmGetCoordianteDM(dm,&dmx);CHKERRQ(ierr);
+  // ierr = DMGetCoordinatesLocal(dm,&X);CHKERRQ(ierr);
+  //ierr = VecGetArrayRead(X,&x);CHKERRQ(ierr);
+
+
+  //ierr = VecRestoreArrayRead(X,&x);CHKERRQ(ierr);
 
   ierr = VecDestroy(&exactSol);CHKERRQ(ierr);
   ierr = VecDestroy(&Ul);CHKERRQ(ierr);
