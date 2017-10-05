@@ -5,6 +5,8 @@
 /* includes the header for PetscDTGaussQuadrature
  that calculates the quadrature points and weights*/
 
+ typedef enum {Q1, Q2} RestricMode;
+
  typedef struct FE_private *FE;
 
  struct FE_private
@@ -12,9 +14,12 @@
   MPI_Comm comm;
   PetscInt polydegree; //Finite Element polynomial degree
   PetscInt dof;        //degrees of freedom at each node
-  PetscInt      *conn;
-  PetscInt      sz_conn;
-  PetscInt      sz_perm_idx;
+  PetscInt      *connQ1,
+                *connQ2,
+                sz_connQ1,
+                sz_connQ2,
+                sz_perm_idx_Q1,
+                sz_perm_idx_Q2;
   struct{
     PetscReal *B;
     PetscReal *D;
