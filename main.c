@@ -39,8 +39,13 @@ int main(int argc, char **argv)
   //ierr = drawOneElem(dm,user);CHKERRQ(ierr);
 
    ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
-   ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
-   ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
+   //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_connQ1: %d\n", fe->sz_connQ1);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_connQ2: %d\n", fe->sz_connQ2);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_perm_idx_Q1: %d\n", fe->sz_perm_idx_Q1);CHKERRQ(ierr);
+  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_perm_idx_Q2: %d\n", fe->sz_perm_idx_Q2);CHKERRQ(ierr);
 
   //ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
 
@@ -52,21 +57,36 @@ int main(int argc, char **argv)
   ierr = DMGetLocalVector(dm,&Ul);CHKERRQ(ierr);
   ierr = VecGetLocalSize(Ul,&sz_Ul);CHKERRQ(ierr);
   //NOTE: Must populate local vector Ul from Glodbal Vector U
-  // ierr = DMGlobalToLocalBegin(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
-  // ierr = DMGlobalToLocalEnd(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
+  // // ierr = DMGlobalToLocalBegin(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
+  // // ierr = DMGlobalToLocalEnd(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Ul,&u);CHKERRQ(ierr);
   //VecGetLocalSize(Ul,&sz_Ul);
   ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
   //VecView(Ul,PETSC_VIEWER_STDOUT_SELF);
-  for(e=0; e < (fe->sz_conn/ fe->sz_perm_idx); e+=user.ne){
-    PetscScalar ue[fe->dof * fe->sz_perm_idx * user.ne]_align;
-    ierr = dmExtractElems(dm, u, e, user.ne, ue);CHKERRQ(ierr);
+
+ //test for Q1 and Q2 dmRestrictElems
+  if(user.interpolate){
+    for(e=0; e < (fe->sz_connQ2/ fe->sz_perm_idx_Q2); e+=user.ne){
+      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q2 * user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q2, ue);CHKERRQ(ierr);
+    }
+    for(e=0; e < (fe->sz_connQ1/ fe->sz_perm_idx_Q1); e+=user.ne){
+      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q1 * user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, ue);CHKERRQ(ierr);
+    }
+  }
+  else
+  {
+    for(e=0; e < (fe->sz_connQ1/ fe->sz_perm_idx_Q1); e+=user.ne){
+      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q1 * user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, ue);CHKERRQ(ierr);
+    }
   }
   ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
 
   // ierr= DmGetCoordianteDM(dm,&dmx);CHKERRQ(ierr);
   // ierr = DMGetCoordinatesLocal(dm,&X);CHKERRQ(ierr);
-  //ierr = VecGetArrayRead(X,&x);CHKERRQ(ierr);
+  // ierr = VecGetArrayRead(X,&x);CHKERRQ(ierr);
 
 
   //ierr = VecRestoreArrayRead(X,&x);CHKERRQ(ierr);
