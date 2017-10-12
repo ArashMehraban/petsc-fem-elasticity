@@ -39,7 +39,7 @@ PetscErrorCode FESetup(FE fe)
   PetscFunctionBeginUser;
   // Reference Element Evaluation
   P = fe->polydegree+1;
-  Q = fe->polydegree+1;  //number of quadrature points in 1D
+  Q = P + fe->addquadpts;  // Number of additonal quadrature points in 1D
 
   //Allocate space for B, D, x ,w
   //                        x: Guass points    w: Gauss weights
