@@ -14,6 +14,7 @@ static char help[] = "fem-elasticity";
 #include "fe.h"
 #include "user.h"
 #include "exact.h"
+#include "topology.h"
 
 //PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
 //PetscErrorCode FormJacobian(SNES,Vec, Mat,Mat, void*);
@@ -26,7 +27,8 @@ int main(int argc, char **argv)
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
   Vec               exactSol, Ul, dmx ,X; //res
-  FE                fe;
+  //FE                fe;
+  Topology          topo;
   PetscInt          sz_Ul,e;
   const PetscScalar *u;
 
@@ -38,14 +40,12 @@ int main(int argc, char **argv)
   ierr = dmCreate(PETSC_COMM_WORLD, user, &dm);CHKERRQ(ierr);
   //ierr = drawOneElem(dm,user);CHKERRQ(ierr);
 
-   ierr = DMGetApplicationContext(dm, &fe);CHKERRQ(ierr);
-   //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->polydegree: %d\n", fe->polydegree);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_connQ1: %d\n", fe->sz_connQ1);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_connQ2: %d\n", fe->sz_connQ2);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_perm_idx_Q1: %d\n", fe->sz_perm_idx_Q1);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->sz_perm_idx_Q2: %d\n", fe->sz_perm_idx_Q2);CHKERRQ(ierr);
+  ierr = DMGetApplicationContext(dm, &topo);CHKERRQ(ierr);
+
+   ierr = PetscPrintf(PETSC_COMM_SELF,"topo->sz_connQ1: %d\n", topo->sz_connQ1);CHKERRQ(ierr);
+   ierr = PetscPrintf(PETSC_COMM_SELF,"topo->sz_connQ2: %d\n", topo->sz_connQ2);CHKERRQ(ierr);
+   ierr = PetscPrintf(PETSC_COMM_SELF,"topo->sz_perm_idx_Q1: %d\n", topo->sz_perm_idx_Q1);CHKERRQ(ierr);
+   ierr = PetscPrintf(PETSC_COMM_SELF,"topo->sz_perm_idx_Q2: %d\n", topo->sz_perm_idx_Q2);CHKERRQ(ierr);
 
   //ierr = DMCreateGlobalVector(dm, &exactSol);CHKERRQ(ierr);
 
@@ -66,20 +66,28 @@ int main(int argc, char **argv)
 
  //test for Q1 and Q2 dmRestrictElems
   if(user.interpolate){
-    for(e=0; e < (fe->sz_connQ2/ fe->sz_perm_idx_Q2); e+=user.ne){
-      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q2 * user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q2, ue);CHKERRQ(ierr);
+    PetscInt numElems;
+
+    ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
+    for(e=0; e < numElems; e+=user.ne){
+      PetscScalar ue[user.dof * topo->sz_perm_idx_Q2 *  user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q2, user.dof ,ue);CHKERRQ(ierr);
     }
-    for(e=0; e < (fe->sz_connQ1/ fe->sz_perm_idx_Q1); e+=user.ne){
-      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q1 * user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, ue);CHKERRQ(ierr);
+
+    for(e=0; e < numElems; e+=user.ne){
+      PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
     }
+
   }
   else
   {
-    for(e=0; e < (fe->sz_connQ1/ fe->sz_perm_idx_Q1); e+=user.ne){
-      PetscScalar ue[fe->dof * fe->sz_perm_idx_Q1 * user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, ue);CHKERRQ(ierr);
+    PetscInt numElems;
+    ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
+
+    for(e=0; e < numElems; e+=user.ne){
+      PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
+      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
     }
   }
   ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
@@ -91,7 +99,7 @@ int main(int argc, char **argv)
 
   //ierr = VecRestoreArrayRead(X,&x);CHKERRQ(ierr);
 
-  ierr = VecDestroy(&exactSol);CHKERRQ(ierr);
+  //ierr = VecDestroy(&exactSol);CHKERRQ(ierr);
   ierr = VecDestroy(&Ul);CHKERRQ(ierr);
 
 
