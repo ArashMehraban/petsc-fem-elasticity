@@ -25,5 +25,6 @@
 
 PetscErrorCode FEbasisEval(FE fe, PetscReal q, PetscReal B[], PetscReal D[]);
 PetscErrorCode FESetup(FE fe);
+PetscErrorCode dmFEcreate(PetscInt dof, PetscInt polydegree, PetscInt addquadpts, FE *fe);
 
 #endif //end of __FE__H
