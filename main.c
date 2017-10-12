@@ -27,7 +27,7 @@ int main(int argc, char **argv)
   DM                dm;
   AppCtx	          user; /*user-defined work context*/
   Vec               exactSol, Ul, dmx ,X; //res
-  //FE                fe;
+  FE                fe;
   Topology          topo;
   PetscInt          sz_Ul,e;
   const PetscScalar *u;
@@ -91,6 +91,10 @@ int main(int argc, char **argv)
     }
   }
   ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
+
+
+  ierr= dmFEcreate(user.dof, user.polydegree, user.addquadpts, &fe);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_SELF,"fe->dof: %d\n", fe->dof);CHKERRQ(ierr);
 
   // ierr= DmGetCoordianteDM(dm,&dmx);CHKERRQ(ierr);
   // ierr = DMGetCoordinatesLocal(dm,&X);CHKERRQ(ierr);
