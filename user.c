@@ -28,8 +28,11 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
   sides and faces for you, in addition to what is read (cells and vertices).*/
     ierr = PetscOptionsBool("-interpolate", "Generate intermediate mesh elements", "main", userOptions->interpolate, &userOptions->interpolate, NULL);  CHKERRQ(ierr);
 
-  // set the number of quadrature points in 1D for the mesh data
+  // set the degree of polynomial for interpolation (1 less than the number of interpolating nodes in 1D)
   ierr = PetscOptionsInt("-polydegree", "Finite Element polynomial degree", "main", userOptions->polydegree, &userOptions->polydegree, NULL);CHKERRQ(ierr);
+
+  // set the number of additional quadrature points in 1D
+  ierr = PetscOptionsInt("-quad", "Finite Element polynomial degree", "main", userOptions->addquadpts, &userOptions->addquadpts, NULL);CHKERRQ(ierr);
 
   // set the number of quadrature points in 1D for the mesh data
   ierr = PetscOptionsInt("-dof", "number of degrees of freedom at each mesh point", "main", userOptions->dof, &userOptions->dof, NULL);CHKERRQ(ierr);
@@ -66,7 +69,8 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
                  sz_perm_idx=0,     //size of permutation array index
                  perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
                  perm8_idx[]  = {1,0,2,3,5,4,6,7};
-  FE             fe;
+  //FE             fe;
+  Topology       topo;
   //Also build Q1 connectivity if Q2 is built
   PetscInt       *connQ1,
                   sz_connQ1,
@@ -109,7 +113,7 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
       ierr = PetscSectionSetDof(section, i, dof);CHKERRQ(ierr);
     }
   }
-  else{  //othersie set sectionf or vertices only
+  else{  //otherwise set section for vertices only
     ierr = DMPlexGetDepthStratum(*dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
     for(i=pStart; i < pEnd; i++){
       if(i >= vStart && i <=vEnd){
@@ -144,7 +148,11 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
   ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
   numCells = cEnd-cStart;
   numPad = ne - (numCells % ne);
-  //ierr = PetscPrintf(PETSC_COMM_SELF,"numCells: %d\n",numCells);CHKERRQ(ierr);
+  if(numPad == ne)
+    numPad = 0;
+
+  // ierr = PetscPrintf(PETSC_COMM_SELF,"numCells: %d\n",numCells);CHKERRQ(ierr);
+  // ierr = PetscPrintf(PETSC_COMM_SELF,"numPad: %d\n",numPad);CHKERRQ(ierr);
 
   sz_conn = sz_perm_idx*(numCells+numPad);
   ierr = PetscCalloc1(sz_conn, &tmp_conn); CHKERRQ(ierr);
@@ -170,6 +178,11 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
          tmp_conn[sz_perm_idx*i+j] = tmpOffset[perm_idx[j]];
        }
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
+  }
+
+  for(i = 0 ; i <sz_conn; i++)
+  {
+      ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
   }
 
 
@@ -235,33 +248,36 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
     ierr = PetscFree(tmp_connQ1);CHKERRQ(ierr);
   }
 
-  //setup FE
-  ierr = PetscNew(&fe);CHKERRQ(ierr);
-  fe->polydegree = user.polydegree;
-  fe->dof = user.dof;
+  // //setup FE
+  // ierr = PetscNew(&fe);CHKERRQ(ierr);
+  // fe->polydegree = user.polydegree;
+  // fe->dof = user.dof;
 
-  //initialize finite element space (fe)
-  ierr = FESetup(fe);CHKERRQ(ierr);
-  //set the connectivities to fe
+  // //initialize finite element space (fe)
+  // ierr = FESetup(fe);CHKERRQ(ierr);
+
+  ierr = PetscNew(&topo);CHKERRQ(ierr);
+
+  //set the connectivities to topo
   if(interpolate){
-    fe->connQ2 = conn;
-    fe->sz_connQ2 = sz_conn;
-    fe->sz_perm_idx_Q2 = sz_perm_idx;
-    fe->connQ1 = connQ1;
-    fe->sz_connQ1 = sz_connQ1;
-    fe->sz_perm_idx_Q1 = sz_perm_idx_Q1;
+    topo->connQ2 = conn;
+    topo->sz_connQ2 = sz_conn;
+    topo->sz_perm_idx_Q2 = sz_perm_idx;
+    topo->connQ1 = connQ1;
+    topo->sz_connQ1 = sz_connQ1;
+    topo->sz_perm_idx_Q1 = sz_perm_idx_Q1;
   }
   else{
-    fe->connQ2 = NULL;
-    fe->sz_connQ2 = 0;
-    fe->sz_perm_idx_Q2 = 0;
-    fe->connQ1 = conn;
-    fe->sz_connQ1 = sz_conn;
-    fe->sz_perm_idx_Q1 = sz_perm_idx;
+    topo->connQ2 = NULL;
+    topo->sz_connQ2 = 0;
+    topo->sz_perm_idx_Q2 = 0;
+    topo->connQ1 = conn;
+    topo->sz_connQ1 = sz_conn;
+    topo->sz_perm_idx_Q1 = sz_perm_idx;
   }
 
-   // set fe to dm
-   ierr = DMSetApplicationContext(*dm, fe);CHKERRQ(ierr);
+   // set topo to dm
+   ierr = DMSetApplicationContext(*dm, topo);CHKERRQ(ierr);
 
   //Destroy PetscSection
 	ierr = PetscSectionDestroy(&section);CHKERRQ(ierr);
@@ -390,57 +406,5 @@ PetscErrorCode drawOneElem(DM dm, AppCtx user){
 
     ierr = VecRestoreArray(coords, &coordsArray); CHKERRQ(ierr);
 
-      PetscFunctionReturn(0);
-}
-
-
-#undef __FUNCT__
-#define __FUNCT__ "dmRestrictElems"
-PetscErrorCode dmRestrictElems(DM dm, const PetscScalar *u, PetscInt elem, PetscInt ne, RestricMode rmode, PetscScalar *y)
-{                                                //u is a vecArray (read-only) passed to this function
-  PetscErrorCode ierr;
-  FE             fe;
-  PetscInt       i, d, //for loop counters
-                 *connPtr = 0,
-                 elemStart, elemEnd,
-                 sz_perm_idx;
-
-  PetscFunctionBeginUser;
-
-  ierr = DMGetApplicationContext(dm,&fe);CHKERRQ(ierr);
-
-  if(rmode == Q1)
-  {
-    elemStart = fe->sz_perm_idx_Q1*elem;
-    elemEnd = fe->sz_perm_idx_Q1*(elem+ne);
-    connPtr = &fe->connQ1[0];
-    sz_perm_idx = fe->sz_perm_idx_Q1;
-  }
-  else if (rmode == Q2){
-    elemStart = fe->sz_perm_idx_Q2*elem;
-    elemEnd = fe->sz_perm_idx_Q2*(elem+ne);
-    connPtr = &fe->connQ2[0];
-    sz_perm_idx = fe->sz_perm_idx_Q2;
-  }
-  else
-  {
-    SETERRQ1(fe->comm, PETSC_ERR_SUP, "RestricMode %D", rmode);
-  }
-
-  // elemStart = fe->sz_perm_idx*elem;
-  // elemEnd = fe->sz_perm_idx*(elem+ne);
-
-  for(i = elemStart; i<elemEnd; i++){
-    const PetscScalar *u_dof;
-    // ierr = DMPlexPointLocalRead(dm, fe->conn[e], u, &u_dof); CHKERRQ(ierr);
-    //u_dof = &u[fe->dof*fe->conn[i]];
-    u_dof = &u[fe->dof*connPtr[i]];
-
-    for(d = 0 ; d < fe->dof; d++){
-      // y[d*(ne*fe->sz_perm_idx)+i-elemStart] = u_dof[d];
-      y[d*(ne*sz_perm_idx)+i-elemStart] = u_dof[d];
-    }
-  }
-
-  PetscFunctionReturn(0);
+    PetscFunctionReturn(0);
 }
