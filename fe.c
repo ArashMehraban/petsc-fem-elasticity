@@ -43,7 +43,7 @@ PetscErrorCode FESetup(FE fe)
 
   //Allocate space for B, D, x ,w
   //                        x: Guass points    w: Gauss weights
-  ierr = PetscMalloc5(P*Q,&(fe->ref.B), P*Q,&fe->ref.D, Q,&fe->ref.x, Q,&fe->ref.w, Q*Q*Q,&fe->ref.w3);CHKERRQ(ierr);
+  ierr = PetscMalloc6(P*Q,&(fe->ref.B), P*Q,&fe->ref.D, Q*Q,&fe->ref.D_tilda, Q,&fe->ref.x, Q,&fe->ref.w, Q*Q*Q,&fe->ref.w3);CHKERRQ(ierr);
   ierr = PetscDTGaussQuadrature(Q,-1,1,fe->ref.x, fe->ref.w);CHKERRQ(ierr);
   //populate w3 which w (kron) w (kron) w
   for(i=0; i<Q; i++){
@@ -59,5 +59,28 @@ PetscErrorCode FESetup(FE fe)
     const PetscReal q = fe->ref.x[i];
     ierr = FEbasisEval(fe, q, &fe->ref.B[i*P], &fe->ref.D[i*P]);CHKERRQ(ierr);
   }
+  //Must change this to a function.  Hard Coded for now:
+  if(P==2 && Q==3){
+    PetscScalar D_tilda[9] = {-0.6455, 0, 0.6455, -0.6455, 0, 0.6455, -0.6455, 0, 0.6455 }; //from Matlab D_tilda = D/B
+    for(i=0; i <Q*Q; i++){
+      fe->ref.D_tilda[i] = D_tilda[i];
+    }
+  }
   PetscFunctionReturn(0);
+}
+#undef __FUNCT__
+#define __FUNCT__ "dmFEcreate"
+PetscErrorCode dmFEcreate(PetscInt dof, PetscInt polydegree, PetscInt addquadpts, FE *fe)
+{
+    PetscErrorCode ierr;
+
+    PetscFunctionBeginUser;
+
+    ierr = PetscNew(fe);CHKERRQ(ierr);
+    (*fe)->dof = dof;
+    (*fe)->addquadpts = addquadpts;
+    (*fe)->polydegree = polydegree;
+    ierr = FESetup(*fe);CHKERRQ(ierr);
+
+    PetscFunctionReturn(0);
 }
