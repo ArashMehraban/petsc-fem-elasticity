@@ -14,6 +14,7 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
   userOptions->polydegree = 0;      //Finite Element polynomial degree
   userOptions->dof = 0;             //degrees of freedom (dof) per vertex
   userOptions->ne = 1;              //default number of elements to extract per iteration
+  userOptions->addquadpts = 0;      //default number of extra quadrature points
 
   //start setting user options from command line
   ierr = PetscOptionsBegin(comm, "", "FEM elasticity options such as mesh filename, polynomial degree,  etc. ", "DMPLEX");CHKERRQ(ierr);
