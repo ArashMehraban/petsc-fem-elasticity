@@ -1,6 +1,7 @@
 #ifndef __FE__H
 #define __FE__H
 
+//#include<petscmat.h>
 #include<petscdt.h>
 /* includes the header for PetscDTGaussQuadrature
  that calculates the quadrature points and weights*/
