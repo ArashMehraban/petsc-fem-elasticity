@@ -61,10 +61,55 @@ PetscErrorCode FESetup(FE fe)
   }
   //Must change this to a function.  Hard Coded for now:
   if(P==2 && Q==3){
-    PetscScalar D_tilda[9] = {-0.6455, 0, 0.6455, -0.6455, 0, 0.6455, -0.6455, 0, 0.6455 }; //from Matlab D_tilda = D/B
-    for(i=0; i <Q*Q; i++){
-      fe->ref.D_tilda[i] = D_tilda[i];
+
+    //get the PsuedoInverse of B
+    PetscScalar *B_in, *B_psu_inv, *tau, *work;
+    ierr = PetscMalloc4(Q*P, &B_in, P*Q, &B_psu_inv, P,&tau, P, &work);CHKERRQ(ierr);
+
+
+    /* Overwrites A. Can only handle full-rank problems with m>=n
+     * A in column-major format
+     * Ainv in row-major format
+     * tau has length m
+     * worksize must be >= max(1,n)
+     */
+    //       PetscDTPseudoInverseQR(PetscInt m, PetscInt mstride, PetscInt n, PetscReal *A_in, PetscReal *Ainv_out,PetscScalar *tau, PetscInt worksize, PetscScalar *work)
+    //ierr = PetscDTPseudoInverseQR(Q,          P, P         , &B_in          , &B_psu_inv         , &tau           , P                , &work);CHKERRQ(ierr);
+
+    PetscScalar matB_psu_inv[P][Q], matD[Q][P];
+    //On the stack, populate Matrix D as appose to array D
+    for (i=0; i<Q; i++) {
+      for (j=0; j<P; j++) {
+        matD[i][j] = fe->ref.D[i*P+j];
+      }
     }
+
+    //on the stack, populate Matrix B_psu_inv as appose to array B_psu_inv
+    for (i=0; i<P; i++) {
+      for (j=0; j<Q; j++) {
+        matB_psu_inv[i][j] = B_psu_inv[i*Q+j];
+      }
+    }
+
+   // populate D_tilda = matD * matB_psu_inv  (D_tilda is in array format)
+   PetscInt m=0;
+   for(i=0; i<Q; i++){
+     for(j=0; j<Q;j++){
+       for(k=0; k<P; k++){
+         fe->ref.D_tilda[m] += matD[i][k] * matB_psu_inv[k][j];
+       }
+       m++;
+     }
+   }
+
+    // PetscScalar D_tilda[9] = {-0.6455, 0, 0.6455, -0.6455, 0, 0.6455, -0.6455, 0, 0.6455 }; //from Matlab D_tilda = D/B
+    // for(i=0; i <Q*Q; i++){
+    //   fe->ref.D_tilda[i] = D_tilda[i];
+    // }
+
+
+    //free space used in PetscDTPseudoInverseQR
+    ierr = PetscFree4(B_in,B_psu_inv,tau,work);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
