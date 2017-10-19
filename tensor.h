@@ -2,7 +2,7 @@
 #define _tensor_h
 
 #include <petscsys.h>
-#include "fefas-align.h"
+#include "fe-align.h"
 
 typedef enum {TENSOR_EVAL,TENSOR_TRANSPOSE} TensorMode;
 
