@@ -2,6 +2,7 @@
 
 static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,PetscInt P,PetscInt Q,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[])
 {
+   PetscInt i,j,k,jk,l,a,b,c,ab,e;
 
   PetscFunctionBegin;
 
@@ -11,18 +12,19 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
   {
     PetscReal R[Q][P];
     const PetscScalar (*restrict x)[P*P*P][ne]_align = (const PetscScalar(*)[P*P*P][ne])xx;
+    PetscScalar       (*restrict y)[P*P*P][ne]_align =       (PetscScalar(*)[Q*Q*Q][ne])yy;
 
-    for (PetscInt i=0; i<Q; i++) {
-      for (PetscInt j=0; j<P; j++) {
+    for (i=0; i<Q; i++) {
+      for (j=0; j<P; j++) {
         R[i][j] = tmode == TENSOR_EVAL ? Rf[i*P+j] : Rf[j*Q+i];
       }
     }
 
-    for (PetscInt i=0; i<P; i++) {
-      for (PetscInt l=0; l<dof; l++) {
-        for (PetscInt a=0; a<Q; a++) {
-          for (PetscInt jk=0; jk<P*P; jk++) {
-            for (PetscInt e=0; e<ne; e++) yy[l][a*P*P+jk][e] += R[a][i] * x[l][i*P*P+jk][e];
+    for (i=0; i<P; i++) {
+      for (l=0; l<dof; l++) {
+        for (a=0; a<Q; a++) {
+          for (jk=0; jk<P*P; jk++) {
+            for (e=0; e<ne; e++) y[l][a*P*P+jk][e] += R[a][i] * x[l][i*P*P+jk][e];
           }
         }
       }
@@ -34,20 +36,21 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
   {
     PetscReal S[Q][P];
     const PetscScalar (*restrict x)[P*P*P][ne]_align = (const PetscScalar(*)[P*P*P][ne])xx;
+    PetscScalar       (*restrict y)[P*P*P][ne]_align =       (PetscScalar(*)[Q*Q*Q][ne])yy;
 
 
-    for (PetscInt i=0; i<Q; i++) {
-      for (PetscInt j=0; j<P; j++) {
+    for (i=0; i<Q; i++) {
+      for (j=0; j<P; j++) {
         S[i][j] = tmode == TENSOR_EVAL ? Sf[i*P+j] : Sf[j*Q+i];
       }
     }
 
-    for (PetscInt l=0; l<dof; l++) {
-      for (PetscInt a=0; a<Q; a++) {
-        for (PetscInt k=0; k<P; k++) {
-          for (PetscInt j=0; j<P; j++) {
-            for (PetscInt b=0; b<Q; b++) {
-              for (PetscInt e=0; e<ne; e++) yy[l][(a*Q+b)*P+k][e] += S[b][j] * x[l][(a*P+j)*P+k][e];
+    for (l=0; l<dof; l++) {
+      for (a=0; a<Q; a++) {
+        for (k=0; k<P; k++) {
+          for (j=0; j<P; j++) {
+            for (b=0; b<Q; b++) {
+              for (e=0; e<ne; e++) y[l][(a*Q+b)*P+k][e] += S[b][j] * x[l][(a*P+j)*P+k][e];
             }
           }
         }
@@ -59,19 +62,20 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
   {
     PetscReal T[Q][P];
     const PetscScalar (*restrict x)[P*P*P][ne]_align = (const PetscScalar(*)[P*P*P][ne])xx;
+    PetscScalar       (*restrict y)[P*P*P][ne]_align =       (PetscScalar(*)[Q*Q*Q][ne])yy;
 
 
-    for (PetscInt i=0; i<Q; i++) {
-      for (PetscInt j=0; j<P; j++) {
+    for (i=0; i<Q; i++) {
+      for (j=0; j<P; j++) {
         T[i][j] = tmode == TENSOR_EVAL ? Tf[i*P+j] : Tf[j*Q+i];
       }
     }
 
-    for (PetscInt l=0; l<dof; l++) {
-      for (PetscInt ab=0; ab<Q*Q; ab++) {
-        for (PetscInt k=0; k<P; k++) {
-          for (PetscInt c=0; c<Q; c++) {
-            for (PetscInt e=0; e<ne; e++) y[l][ab*Q+c][e] += T[c][k] * xx[l][ab*P+k][e];
+    for (l=0; l<dof; l++) {
+      for (ab=0; ab<Q*Q; ab++) {
+        for (k=0; k<P; k++) {
+          for (c=0; c<Q; c++) {
+            for (e=0; e<ne; e++) y[l][ab*Q+c][e] += T[c][k] * x[l][ab*P+k][e];
           }
         }
       }
@@ -85,8 +89,8 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
     PetscScalar       (*restrict y)[P*P*P][ne]_align =       (PetscScalar(*)[Q*Q*Q][ne])yy;
     PetscScalar u[dof][Q*P*P][ne]_align,v[dof][Q*Q*P][ne]_align;
 
-    for (PetscInt i=0; i<Q; i++) {
-      for (PetscInt j=0; j<P; j++) {
+    for (i=0; i<Q; i++) {
+      for (j=0; j<P; j++) {
         R[i][j] = tmode == TENSOR_EVAL ? Rf[i*P+j] : Rf[j*Q+i];
         S[i][j] = tmode == TENSOR_EVAL ? Sf[i*P+j] : Sf[j*Q+i];
         T[i][j] = tmode == TENSOR_EVAL ? Tf[i*P+j] : Tf[j*Q+i];
@@ -95,11 +99,11 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
 
     // u[l,a,j,k] = R[a,i] x[l,i,j,k]
     PetscMemzero(u,sizeof u);
-    for (PetscInt i=0; i<P; i++) {
-      for (PetscInt l=0; l<dof; l++) {
-        for (PetscInt a=0; a<Q; a++) {
-          for (PetscInt jk=0; jk<P*P; jk++) {
-            for (PetscInt e=0; e<ne; e++) u[l][a*P*P+jk][e] += R[a][i] * x[l][i*P*P+jk][e];
+    for (i=0; i<P; i++) {
+      for (l=0; l<dof; l++) {
+        for (a=0; a<Q; a++) {
+          for (jk=0; jk<P*P; jk++) {
+            for (e=0; e<ne; e++) u[l][a*P*P+jk][e] += R[a][i] * x[l][i*P*P+jk][e];
           }
         }
       }
@@ -107,12 +111,12 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
 
     // v[l,a,b,k] = S[b,j] u[l,a,j,k]
     PetscMemzero(v,sizeof v);
-    for (PetscInt l=0; l<dof; l++) {
-      for (PetscInt a=0; a<Q; a++) {
-        for (PetscInt k=0; k<P; k++) {
-          for (PetscInt j=0; j<P; j++) {
-            for (PetscInt b=0; b<Q; b++) {
-              for (PetscInt e=0; e<ne; e++) v[l][(a*Q+b)*P+k][e] += S[b][j] * u[l][(a*P+j)*P+k][e];
+    for (l=0; l<dof; l++) {
+      for (a=0; a<Q; a++) {
+        for (k=0; k<P; k++) {
+          for (j=0; j<P; j++) {
+            for (b=0; b<Q; b++) {
+              for (e=0; e<ne; e++) v[l][(a*Q+b)*P+k][e] += S[b][j] * u[l][(a*P+j)*P+k][e];
             }
           }
         }
@@ -120,11 +124,11 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
     }
 
     // y[l,a,b,c] = T[c,k] v[l,a,b,k]
-    for (PetscInt l=0; l<dof; l++) {
-      for (PetscInt ab=0; ab<Q*Q; ab++) {
-        for (PetscInt k=0; k<P; k++) {
-          for (PetscInt c=0; c<Q; c++) {
-            for (PetscInt e=0; e<ne; e++) y[l][ab*Q+c][e] += T[c][k] * v[l][ab*P+k][e];
+    for (l=0; l<dof; l++) {
+      for (ab=0; ab<Q*Q; ab++) {
+        for (k=0; k<P; k++) {
+          for (c=0; c<Q; c++) {
+            for (e=0; e<ne; e++) y[l][ab*Q+c][e] += T[c][k] * v[l][ab*P+k][e];
           }
         }
       }
@@ -133,25 +137,6 @@ static inline PetscErrorCode TensorContract_Inline(PetscInt ne,PetscInt dof,Pets
   }
   PetscFunctionReturn(0);
 }
-
-// static inline PetscErrorCode TensorContract_I1_Inline(PetscInt ne,PetscInt dof,PetscInt P,PetscInt Q,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[])
-// {
-//   PetscFunctionBegin;
-//
-//   PetscFunctionReturn(0);
-// }
-// static inline PetscErrorCode TensorContract_I2_Inline(PetscInt ne,PetscInt dof,PetscInt P,PetscInt Q,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[])
-// {
-//   PetscFunctionBegin;
-//
-//   PetscFunctionReturn(0);
-// }
-// static inline PetscErrorCode TensorContract_I3_Inline(PetscInt ne,PetscInt dof,PetscInt P,PetscInt Q,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[])
-// {
-//   PetscFunctionBegin;
-//
-//   PetscFunctionReturn(0);
-// }
 
 static inline PetscErrorCode TensorContract_Ref(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
   PetscInt ne = ten->ne,dof = ten->dof,P = ten->P,Q = ten->Q;
@@ -167,7 +152,7 @@ static PetscErrorCode TensorContract_Ref_4_3_2_2(Tensor ten,const PetscReal Rf[]
 static PetscErrorCode TensorContract_Ref_4_1_2_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
   return TensorContract_Inline(4,1,2,3,Rf,Sf,Tf,tmode,xx,yy);
 }
-static PetscErrorCode TensorContract_Ref_4_3_3_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
+static PetscErrorCode TensorContract_Ref_4_3_2_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
   return TensorContract_Inline(4,3,2,3,Rf,Sf,Tf,tmode,xx,yy);
 }
 static PetscErrorCode TensorContract_Ref_4_1_3_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
@@ -176,22 +161,6 @@ static PetscErrorCode TensorContract_Ref_4_1_3_3(Tensor ten,const PetscReal Rf[]
 static PetscErrorCode TensorContract_Ref_4_3_3_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
   return TensorContract_Inline(4,3,3,3,Rf,Sf,Tf,tmode,xx,yy);
 }
-// static PetscErrorCode TensorContract_I_Ref_4_1_2_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
-//   if(Sf == NULL && Tf == NULL)
-//     return TensorContract_I1_Inline(4,1,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(D_tilda,I) , I)
-//   else if(Rf == NULL && Tf == NULL)
-//     return TensorContract_I2_Inline(4,1,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(I ,D_tilda) , I)
-//   else if(Rf == NULL && Sf == NULL)
-//     return TensorContract_I3_Inline(4,1,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(I,I) , D_tilda)
-// }
-// static PetscErrorCode TensorContract_I_Ref_4_3_2_3(Tensor ten,const PetscReal Rf[],const PetscReal Sf[],const PetscReal Tf[],TensorMode tmode,const PetscScalar xx[],PetscScalar yy[]) {
-//   if(Sf == NULL && Tf == NULL)
-//     return TensorContract_I1_Inline(4,3,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(D_tilda,I) , I)
-//   else if(Rf == NULL && Tf == NULL)
-//     return TensorContract_I2_Inline(4,3,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(I ,D_tilda) , I)
-//   else if(Rf == NULL && Sf == NULL)
-//     return TensorContract_I3_Inline(4,3,2,3,Rf,Sf,Tf,tmode,xx,yy);  // kron(kron(I,I) , D_tilda)
-// }
 
 PetscErrorCode TensorSelect_AVX(Tensor);
 PetscErrorCode TensorSelect_AVX512(Tensor);
@@ -222,9 +191,9 @@ PetscErrorCode TensorCreate(PetscInt ne,PetscInt dof,PetscInt P,PetscInt Q,Tenso
       break;
     }
   }
-  ierr = TensorSelect_AVX(t);CHKERRQ(ierr);
-  ierr = TensorSelect_AVX512(t);CHKERRQ(ierr);
-  ierr = TensorSelect_QPX(t);CHKERRQ(ierr);
+  // ierr = TensorSelect_AVX(t);CHKERRQ(ierr);
+  // ierr = TensorSelect_AVX512(t);CHKERRQ(ierr);
+  // ierr = TensorSelect_QPX(t);CHKERRQ(ierr);
   *ten = t;
   PetscFunctionReturn(0);
 }
