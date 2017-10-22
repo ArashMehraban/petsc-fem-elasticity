@@ -1,4 +1,4 @@
-CFLAGS           =
+CFLAGS           = -std=c99
 FFLAGS           =
 CPPFLAGS         =
 FPPFLAGS         =
@@ -9,8 +9,8 @@ include ${PETSC_DIR}/lib/petsc/conf/rules
 
 all: main
 
-main: main.o fe.o user.o exact.o topology.o chkopts
-	-${CLINKER} -o main main.o fe.o user.o exact.o topology.o ${PETSC_KSP_LIB} ${PETSC_LIB} ${PETSC_SNES_LIB}
+main: main.o fe.o user.o exact.o topology.o tensor.o chkopts
+	-${CLINKER} -o main main.o fe.o user.o exact.o topology.o tensor.o ${PETSC_KSP_LIB} ${PETSC_LIB} ${PETSC_SNES_LIB}
 	${RM} main.o fe.o user.o exact.o topology.o
 
 
