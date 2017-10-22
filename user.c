@@ -46,6 +46,44 @@ PetscErrorCode processUserOptions(MPI_Comm comm, AppCtx *userOptions)
   PetscFunctionReturn(0);
 }
 
+
+#undef __FUNCT__
+#define __FUNCT__ "getConn"
+static PetscErrorCode getConn(DM *dm, PetscSection section, PetscInt cStart, PetscInt cEnd, const PetscInt *perm_idx, PetscInt sz_perm_idx, PetscInt *tmp_conn){
+
+  PetscErrorCode ierr;
+  PetscInt i, j,           //counters
+           numPoints,      //number of points in TransitiveClosure
+           *points;        //array of points in TransitiveClosure
+
+  PetscFunctionBeginUser;
+
+  for(i = cStart ; i <cEnd; i++)
+  {
+     points=NULL;
+     //get the TransitiveClosure of each element
+     ierr = DMPlexGetTransitiveClosure(*dm, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
+     //ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+     PetscInt tmpOffset[sz_perm_idx];
+     PetscInt k =0;
+     for(j = 0; j < numPoints ; j++){
+         PetscInt tmpdof;
+
+         PetscSectionGetDof(section, points[2*j], &tmpdof);
+         if (!tmpdof)  continue;
+         PetscSectionGetOffset(section, points[2*j], &tmpOffset[k++]);
+       }
+       for(j=0; j<k; j++){
+         //permute the TransitiveClosure of each elemet according to perm_idx
+         tmp_conn[sz_perm_idx*i+j] = tmpOffset[perm_idx[j]];
+       }
+        ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
+  }
+
+  PetscFunctionReturn(0);
+
+}
+
 #undef __FUNCT__
 #define __FUNCT__ "dmCreate"
 PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
@@ -64,18 +102,20 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
   PetscInt       ne           = user.ne;
 	PetscErrorCode ierr;
 	DM distributedMesh = NULL;
-  PetscSection   section;
+  PetscSection   section, sectionQ1,coordsSection;
   PetscInt       *conn, *tmp_conn, sz_conn;
-  PetscInt       *perm_idx,         //permutation array index for local ordering
-                 sz_perm_idx=0,     //size of permutation array index
-                 perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
-                 perm8_idx[]  = {1,0,2,3,5,4,6,7};
+  PetscInt       //*perm_idx,         //permutation array index for local ordering
+                 sz_perm_idx=0;     //size of permutation array index
+  const PetscInt perm27_idx[] = {22,10,19,9,1,7,21,8,20,15,3,16,5,0,6,18,4,17,24,11,23,12,2,14,25,13,26},
+                 perm8_idx[]  = {1,0,2,3,5,4,6,7},
+                 *perm_idx;
   //FE             fe;
   Topology       topo;
   //Also build Q1 connectivity if Q2 is built
   PetscInt       *connQ1,
                   sz_connQ1,
                   sz_perm_idx_Q1;
+  PetscInt        dim;
 
 
 
@@ -113,6 +153,22 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
     for(i=pStart; i < pEnd; i++){
       ierr = PetscSectionSetDof(section, i, dof);CHKERRQ(ierr);
     }
+    // ierr = PetscSectionCreate(comm,&sectionQ1);CHKERRQ(ierr);
+    // //Set the number of fields from userCtx
+  	// ierr = PetscSectionSetNumFields(sectionQ1, 1);CHKERRQ(ierr);
+    // ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
+    // ierr = DMPlexGetDepthStratum(*dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
+    // ierr = PetscSectionSetChart(sectionQ1,cStart, vEnd);CHKERRQ(ierr);
+    // PetscPrintf(PETSC_COMM_SELF,"SectionQ1: vStart,vEnd, %d, %d\n", vStart,vEnd);
+    //
+    // ierr = DMGetDimension(*dm, &dim);CHKERRQ(ierr);
+    // for(i=cStart; i<cEnd; i++){
+    //   ierr = PetscSectionSetDof(sectionQ1,i,0);CHKERRQ(ierr);
+    // }
+    // for(i=vStart; i<vEnd; i++){
+    //   ierr = PetscSectionSetDof(sectionQ1,i,dim);CHKERRQ(ierr);
+    // }
+    // ierr = PetscSectionSetUp(sectionQ1);CHKERRQ(ierr);
   }
   else{  //otherwise set section for vertices only
     ierr = DMPlexGetDepthStratum(*dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
@@ -128,21 +184,30 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
   }
   //Calculate offsets based upon the number of degrees of freedom for each point.
 	ierr = PetscSectionSetUp(section);CHKERRQ(ierr);
+
+PetscSectionView(section, PETSC_VIEWER_STDOUT_WORLD);
+if(interpolate){
+  PetscSectionView(sectionQ1, PETSC_VIEWER_STDOUT_WORLD);
+}
+PetscPrintf(PETSC_COMM_SELF,"Hi\n");
   //Set the section for dm
-	ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
+ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
+
 
 
   if(interpolate){
     sz_perm_idx = 27;
-    ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
-    for(i=0; i<sz_perm_idx; i++)
-      perm_idx[i] = perm27_idx[i];
+    //ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
+    perm_idx = &perm27_idx[0];
+    // for(i=0; i<sz_perm_idx; i++)
+    //   perm_idx[i] = perm27_idx[i];
   }
   else{
     sz_perm_idx = 8;
-    ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
-    for(i=0; i<sz_perm_idx; i++)
-      perm_idx[i] = perm8_idx[i];
+    //ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
+    // for(i=0; i<sz_perm_idx; i++)
+    //   perm_idx[i] = perm8_idx[i];
+    perm_idx = &perm8_idx[0];
   }
 
   //in hierarchy of interpolated mesh topology, get all the cells (elements). (Height 0)
@@ -181,10 +246,15 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
   }
 
-  for(i = 0 ; i <sz_conn; i++)
-  {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
-  }
+  // for(i = 0 ; i <sz_conn; i++)
+  // {
+  //     ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
+  // }
+
+
+    // ierr= DMGetCoordinateSection(*dm, &coordsSection);CHKERRQ(ierr);
+    // PetscPrintf(PETSC_COMM_SELF, "coordsSection:\n");
+    // PetscSectionView(coordsSection, PETSC_VIEWER_STDOUT_WORLD);
 
 
 
@@ -216,11 +286,29 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
     }
   }
 
+//delete this:
+// {
+//   DM dmc;
+//   PetscInt const *myCone;
+//   DMGetCoordinateDM(*dm,&dmc);
+//   for(i = cStart ; i <cEnd; i++)
+//   {
+//     ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
+//     //ierr = PetscPrintf(PETSC_COMM_SELF,"coords[%d]: [%d, %d ,%d, %d,%d, %d ,%d, %d]\n", i , myCone[0], myCone[1],myCone[2],myCone[3],myCone[4], myCone[5],myCone[6],myCone[7]);CHKERRQ(ierr);
+//   }
+// }
+
+
   //if interpolated, also build a connectivity matrix based on Q1
   if(interpolate)
   {
+    DM dmc;
     PetscInt *tmp_connQ1;
     PetscInt const *myCone;
+    PetscInt sz_cone;
+
+    ierr = DMGetCoordinateDM(*dm,&dmc);CHKERRQ(ierr);
+    ierr = DMGetCoordinateSection(*dm, &coordsSection);CHKERRQ(ierr);
 
     sz_perm_idx_Q1 = 8;
     sz_connQ1 = sz_perm_idx_Q1*(numCells+numPad);
@@ -228,24 +316,78 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
     ierr = PetscCalloc1(sz_connQ1, &tmp_connQ1); CHKERRQ(ierr);
     ierr = PetscCalloc1(sz_connQ1, &connQ1); CHKERRQ(ierr);
 
-  	for(i = cStart ; i <cEnd; i++)
-  	{
-  		ierr = DMPlexGetCone(*dm, i, &myCone);CHKERRQ(ierr);
-      for(j = 0; j < sz_perm_idx_Q1; j++){
-        tmp_connQ1[sz_perm_idx_Q1*i+j] = myCone[perm8_idx[j]];
-      }
-  	}
+    // for(i = cStart ; i <cEnd; i++)
+  	// {
+  	// 	ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
+    //   ierr = PetscPrintf(PETSC_COMM_SELF,"coords[%d]: [%d, %d ,%d, %d,%d, %d ,%d, %d]\n", i , myCone[0], myCone[1],myCone[2],myCone[3],myCone[4], myCone[5],myCone[6],myCone[7]);CHKERRQ(ierr);
+    // }
 
-    //permute tmp_connQ1 based on ne
-    PetscInt m = 0;
-    for(k = 0; k < sz_connQ1/(ne*sz_perm_idx_Q1);k++){
-      for(j = 0; j< sz_perm_idx_Q1; j++){
-        for(i = 0; i < ne; i++){
-          connQ1[m] = tmp_connQ1[i*sz_perm_idx_Q1+j+k*(ne*sz_perm_idx_Q1)];
-          m++;
-        }
-      }
+    for(i = cStart ; i <cEnd; i++)
+    {
+       points=NULL;
+       //get the TransitiveClosure of each element
+       ierr = DMPlexGetTransitiveClosure(dmc, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
+       //ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+       PetscInt tmpOffset[27];
+       PetscInt k =0;
+       for(j = 0; j < numPoints ; j++){
+           PetscInt tmpdof;
+
+           PetscSectionGetDof(coordsSection, points[2*j], &tmpdof);
+           if (!tmpdof)  continue;
+           PetscSectionGetOffset(coordsSection, points[2*j], &tmpOffset[k++]);
+         }
+         for(j=0; j<k; j++){
+           //permute the TransitiveClosure of each elemet according to perm_idx
+           tmp_connQ1[sz_perm_idx_Q1*i+j] = tmpOffset[perm8_idx[j]];
+         }
+          ierr = DMPlexRestoreTransitiveClosure(dmc, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
+
+
+  	// for(i = cStart ; i <cEnd; i++)
+  	// {
+  	// 	//ierr = DMPlexGetCone(*dm, i, &myCone);CHKERRQ(ierr);
+    //   ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
+    //   //ierr = DMPlexGetConeSize(dmc,i ,&sz_cone);CHKERRQ(ierr);
+    //   //PetscPrintf(PETSC_COMM_SELF,"sz_cone: %d\n", sz_cone);
+    //
+    //
+    //
+    //   PetscInt tmpOffset[8];
+    //   PetscInt k =0;
+    //   for(j = 0; j < sz_perm_idx_Q1 ; j++){
+    //       PetscInt tmpdof;
+    //
+    //       PetscSectionGetDof(sectionQ1, myCone[j], &tmpdof);
+    //       //PetscSectionGetDof(section, myCone[j], &tmpdof);
+    //       //PetscPrintf(PETSC_COMM_SELF,"myCone[%d], %d\n", j , myCone[j]);
+    //       if (!tmpdof)  continue;
+    //        PetscSectionGetOffset(section, myCone[j], &tmpOffset[k++]);
+    //     }
+    //     for(j=0; j<k; j++){
+    //       //permute according to perm8_idx
+    //       tmp_connQ1[sz_perm_idx_Q1*i+j] = tmpOffset[perm8_idx[j]];
+    //     }
+    //
+    //
+    //
+    //
+    //   // for(j = 0; j < sz_perm_idx_Q1; j++){
+    //   //   tmp_connQ1[sz_perm_idx_Q1*i+j] = myCone[perm8_idx[j]];
+    //   // }
+  	// }
+    //
+    // //permute tmp_connQ1 based on ne
+    // PetscInt m = 0;
+    // for(k = 0; k < sz_connQ1/(ne*sz_perm_idx_Q1);k++){
+    //   for(j = 0; j< sz_perm_idx_Q1; j++){
+    //     for(i = 0; i < ne; i++){
+    //       connQ1[m] = tmp_connQ1[i*sz_perm_idx_Q1+j+k*(ne*sz_perm_idx_Q1)];
+    //       m++;
+    //     }
+    //   }
+    // }
     ierr = PetscFree(tmp_connQ1);CHKERRQ(ierr);
   }
 
