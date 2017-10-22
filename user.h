@@ -22,6 +22,5 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm);
 /* Use drawOneElem after calling dmCreate.
    It is best to use this function with one element to see its connectivity */
 PetscErrorCode drawOneElem(DM dm,AppCtx user);
-//PetscErrorCode dmRestrictElems(DM dm, const PetscScalar *u, PetscInt elem, PetscInt ne, RestricMode rmode, PetscScalar *y);
 
 #endif //end of __USER__H
