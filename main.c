@@ -15,6 +15,7 @@ static char help[] = "fem-elasticity";
 #include "user.h"
 #include "exact.h"
 #include "topology.h"
+#include "tensor.h"
 
 //PetscErrorCode FormFunction(SNES,Vec,Vec,void*);
 //PetscErrorCode FormJacobian(SNES,Vec, Mat,Mat, void*);
@@ -54,43 +55,43 @@ int main(int argc, char **argv)
 
   //ierr = DMCreateGlobalVector(dm, &res);CHKERRQ(ierr);
 
-  ierr = DMGetLocalVector(dm,&Ul);CHKERRQ(ierr);
-  ierr = VecGetLocalSize(Ul,&sz_Ul);CHKERRQ(ierr);
+  // ierr = DMGetLocalVector(dm,&Ul);CHKERRQ(ierr);
+  // ierr = VecGetLocalSize(Ul,&sz_Ul);CHKERRQ(ierr);
   //NOTE: Must populate local vector Ul from Glodbal Vector U
-  // // ierr = DMGlobalToLocalBegin(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
-  // // ierr = DMGlobalToLocalEnd(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
-  ierr = VecGetArrayRead(Ul,&u);CHKERRQ(ierr);
-  //VecGetLocalSize(Ul,&sz_Ul);
-  ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
-  //VecView(Ul,PETSC_VIEWER_STDOUT_SELF);
+  // // // ierr = DMGlobalToLocalBegin(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
+  // // // ierr = DMGlobalToLocalEnd(dm,U,INSERT_VALUES,Ul);CHKERRQ(ierr);
+  // ierr = VecGetArrayRead(Ul,&u);CHKERRQ(ierr);
+  // VecGetLocalSize(Ul,&sz_Ul);
+  // ierr = PetscPrintf(PETSC_COMM_SELF,"sz_Ul %d\n",sz_Ul);CHKERRQ(ierr);
+  // //VecView(Ul,PETSC_VIEWER_STDOUT_SELF);
 
  //test for Q1 and Q2 dmRestrictElems
-  if(user.interpolate){
-    PetscInt numElems;
-
-    ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
-    for(e=0; e < numElems; e+=user.ne){
-      PetscScalar ue[user.dof * topo->sz_perm_idx_Q2 *  user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q2, user.dof ,ue);CHKERRQ(ierr);
-    }
-
-    for(e=0; e < numElems; e+=user.ne){
-      PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
-    }
-
-  }
-  else
-  {
-    PetscInt numElems;
-    ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
-
-    for(e=0; e < numElems; e+=user.ne){
-      PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
-      ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
-    }
-  }
-  ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
+  // if(user.interpolate){
+  //   PetscInt numElems;
+  //
+  //   ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
+  //   for(e=0; e < numElems; e+=user.ne){
+  //     PetscScalar ue[user.dof * topo->sz_perm_idx_Q2 *  user.ne]_align;
+  //     ierr = dmRestrictElems(dm, u, e, user.ne, Q2, user.dof ,ue);CHKERRQ(ierr);
+  //   }
+  //
+  //   for(e=0; e < numElems; e+=user.ne){
+  //     PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
+  //     ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
+  //   }
+  //
+  // }
+  // else
+  // {
+  //   PetscInt numElems;
+  //   ierr = getNumElems(topo, &numElems);CHKERRQ(ierr);
+  //
+  //   for(e=0; e < numElems; e+=user.ne){
+  //     PetscScalar ue[user.dof * topo->sz_perm_idx_Q1 *  user.ne]_align;
+  //     ierr = dmRestrictElems(dm, u, e, user.ne, Q1, user.dof , ue);CHKERRQ(ierr);
+  //   }
+  // }
+  // ierr = VecRestoreArrayRead(Ul,&u);CHKERRQ(ierr);
 
 
   ierr= dmFEcreate(user.dof, user.polydegree, user.addquadpts, &fe);CHKERRQ(ierr);
@@ -104,7 +105,7 @@ int main(int argc, char **argv)
   //ierr = VecRestoreArrayRead(X,&x);CHKERRQ(ierr);
 
   //ierr = VecDestroy(&exactSol);CHKERRQ(ierr);
-  ierr = VecDestroy(&Ul);CHKERRQ(ierr);
+  //ierr = VecDestroy(&Ul);CHKERRQ(ierr);
 
 
 
