@@ -65,11 +65,21 @@ PetscErrorCode FESetup(FE fe)
     //get the PsuedoInverse of B
     PetscReal *Bsource, *Binv;
     PetscScalar *tau, *work;
-    ierr = PetscMalloc4(Q*P, &Bsource, P*Q, &Binv, Q, &tau, Q,&work);CHKERRQ(ierr);
+    ierr = PetscMalloc4(Q*P, &Bsource, P*Q, &Binv, Q, &tau, Q*P,&work);CHKERRQ(ierr);
+
+    for(i=0;i<P*Q;i++)
+      PetscPrintf(PETSC_COMM_SELF, "fe->ref.B[%d]: %f\n",i, fe->ref.B[i]);
+
+    for(i=0; i<P*Q;i++)
+      Bsource[i] = fe->ref.B[i];
 
     ierr = PetscDTPseudoInverseQR(Q, Q, P, Bsource, Binv, tau, Q, work);CHKERRQ(ierr);
 
+    for(i=0;i<P*Q;i++)
+      PetscPrintf(PETSC_COMM_SELF, "Binv[%d]:%f\n",i, Binv[i]);
+
     PetscScalar matBinv[P][Q];
+
     //On the stack, populate Matrix Binv as appose to array Binv
     for(i=0; i<P; i++){
       for(j=0; j<Q; j++){
