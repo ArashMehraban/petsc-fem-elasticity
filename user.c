@@ -153,22 +153,6 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
     for(i=pStart; i < pEnd; i++){
       ierr = PetscSectionSetDof(section, i, dof);CHKERRQ(ierr);
     }
-    // ierr = PetscSectionCreate(comm,&sectionQ1);CHKERRQ(ierr);
-    // //Set the number of fields from userCtx
-  	// ierr = PetscSectionSetNumFields(sectionQ1, 1);CHKERRQ(ierr);
-    // ierr = DMPlexGetHeightStratum(*dm, 0, &cStart,&cEnd);CHKERRQ(ierr);
-    // ierr = DMPlexGetDepthStratum(*dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
-    // ierr = PetscSectionSetChart(sectionQ1,cStart, vEnd);CHKERRQ(ierr);
-    // PetscPrintf(PETSC_COMM_SELF,"SectionQ1: vStart,vEnd, %d, %d\n", vStart,vEnd);
-    //
-    // ierr = DMGetDimension(*dm, &dim);CHKERRQ(ierr);
-    // for(i=cStart; i<cEnd; i++){
-    //   ierr = PetscSectionSetDof(sectionQ1,i,0);CHKERRQ(ierr);
-    // }
-    // for(i=vStart; i<vEnd; i++){
-    //   ierr = PetscSectionSetDof(sectionQ1,i,dim);CHKERRQ(ierr);
-    // }
-    // ierr = PetscSectionSetUp(sectionQ1);CHKERRQ(ierr);
   }
   else{  //otherwise set section for vertices only
     ierr = DMPlexGetDepthStratum(*dm, 0, &vStart,&vEnd);CHKERRQ(ierr);
@@ -184,29 +168,17 @@ PetscErrorCode dmCreate(MPI_Comm comm, AppCtx user, DM *dm)
   }
   //Calculate offsets based upon the number of degrees of freedom for each point.
 	ierr = PetscSectionSetUp(section);CHKERRQ(ierr);
-
-PetscSectionView(section, PETSC_VIEWER_STDOUT_WORLD);
-if(interpolate){
-  PetscSectionView(sectionQ1, PETSC_VIEWER_STDOUT_WORLD);
-}
-PetscPrintf(PETSC_COMM_SELF,"Hi\n");
   //Set the section for dm
-ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
+  ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
 
 
 
   if(interpolate){
     sz_perm_idx = 27;
-    //ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
     perm_idx = &perm27_idx[0];
-    // for(i=0; i<sz_perm_idx; i++)
-    //   perm_idx[i] = perm27_idx[i];
   }
   else{
     sz_perm_idx = 8;
-    //ierr = PetscMalloc1(sz_perm_idx,&perm_idx);CHKERRQ(ierr);
-    // for(i=0; i<sz_perm_idx; i++)
-    //   perm_idx[i] = perm8_idx[i];
     perm_idx = &perm8_idx[0];
   }
 
@@ -235,9 +207,9 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
      for(j = 0; j < numPoints ; j++){
          PetscInt tmpdof;
 
-         PetscSectionGetDof(section, points[2*j], &tmpdof);
+         ierr = PetscSectionGetDof(section, points[2*j], &tmpdof);CHKERRQ(ierr);
          if (!tmpdof)  continue;
-         PetscSectionGetOffset(section, points[2*j], &tmpOffset[k++]);
+         ierr = PetscSectionGetOffset(section, points[2*j], &tmpOffset[k++]);CHKERRQ(ierr);
        }
        for(j=0; j<k; j++){
          //permute the TransitiveClosure of each elemet according to perm_idx
@@ -245,18 +217,6 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
        }
         ierr = DMPlexRestoreTransitiveClosure(*dm, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
   }
-
-  // for(i = 0 ; i <sz_conn; i++)
-  // {
-  //     ierr = PetscPrintf(PETSC_COMM_SELF,"tmp_conn[%d]: %d\n",i, tmp_conn[i]);CHKERRQ(ierr);
-  // }
-
-
-    // ierr= DMGetCoordinateSection(*dm, &coordsSection);CHKERRQ(ierr);
-    // PetscPrintf(PETSC_COMM_SELF, "coordsSection:\n");
-    // PetscSectionView(coordsSection, PETSC_VIEWER_STDOUT_WORLD);
-
-
 
   //pad tmp_conn with the last element
   if(numPad){
@@ -286,18 +246,6 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
     }
   }
 
-//delete this:
-// {
-//   DM dmc;
-//   PetscInt const *myCone;
-//   DMGetCoordinateDM(*dm,&dmc);
-//   for(i = cStart ; i <cEnd; i++)
-//   {
-//     ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
-//     //ierr = PetscPrintf(PETSC_COMM_SELF,"coords[%d]: [%d, %d ,%d, %d,%d, %d ,%d, %d]\n", i , myCone[0], myCone[1],myCone[2],myCone[3],myCone[4], myCone[5],myCone[6],myCone[7]);CHKERRQ(ierr);
-//   }
-// }
-
 
   //if interpolated, also build a connectivity matrix based on Q1
   if(interpolate)
@@ -306,9 +254,11 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
     PetscInt *tmp_connQ1;
     PetscInt const *myCone;
     PetscInt sz_cone;
+    PetscInt dmcpStart, dmcpEnd,dmcSecStart,dmcSecEnd;
 
     ierr = DMGetCoordinateDM(*dm,&dmc);CHKERRQ(ierr);
     ierr = DMGetCoordinateSection(*dm, &coordsSection);CHKERRQ(ierr);
+    ierr = PetscSectionGetChart(coordsSection, &dmcSecStart,&dmcSecEnd);CHKERRQ(ierr);
 
     sz_perm_idx_Q1 = 8;
     sz_connQ1 = sz_perm_idx_Q1*(numCells+numPad);
@@ -316,26 +266,23 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
     ierr = PetscCalloc1(sz_connQ1, &tmp_connQ1); CHKERRQ(ierr);
     ierr = PetscCalloc1(sz_connQ1, &connQ1); CHKERRQ(ierr);
 
-    // for(i = cStart ; i <cEnd; i++)
-  	// {
-  	// 	ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
-    //   ierr = PetscPrintf(PETSC_COMM_SELF,"coords[%d]: [%d, %d ,%d, %d,%d, %d ,%d, %d]\n", i , myCone[0], myCone[1],myCone[2],myCone[3],myCone[4], myCone[5],myCone[6],myCone[7]);CHKERRQ(ierr);
-    // }
-
     for(i = cStart ; i <cEnd; i++)
     {
        points=NULL;
        //get the TransitiveClosure of each element
        ierr = DMPlexGetTransitiveClosure(dmc, i, PETSC_TRUE, &numPoints , &points);CHKERRQ(ierr);
-       //ierr = PetscPrintf(PETSC_COMM_SELF,"numPpoints: %d\n",numPoints);CHKERRQ(ierr);
+       //ierr = PetscPrintf(PETSC_COMM_SELF,"numPoints: %d\n",numPoints);CHKERRQ(ierr);
        PetscInt tmpOffset[27];
        PetscInt k =0;
        for(j = 0; j < numPoints ; j++){
            PetscInt tmpdof;
 
-           PetscSectionGetDof(coordsSection, points[2*j], &tmpdof);
+           //if the current point is not in dmc PetscSection, ignore
+           if(points[2*j]<dmcSecStart || points[2*j]>=dmcSecEnd) continue;
+           ierr = PetscSectionGetDof(coordsSection, points[2*j], &tmpdof);CHKERRQ(ierr);
+
            if (!tmpdof)  continue;
-           PetscSectionGetOffset(coordsSection, points[2*j], &tmpOffset[k++]);
+           ierr = PetscSectionGetOffset(coordsSection, points[2*j], &tmpOffset[k++]);CHKERRQ(ierr);
          }
          for(j=0; j<k; j++){
            //permute the TransitiveClosure of each elemet according to perm_idx
@@ -344,50 +291,16 @@ ierr = DMSetDefaultSection(*dm,section);CHKERRQ(ierr);
           ierr = DMPlexRestoreTransitiveClosure(dmc, i , PETSC_TRUE, &numPoints, &points);CHKERRQ(ierr);
     }
 
-
-  	// for(i = cStart ; i <cEnd; i++)
-  	// {
-  	// 	//ierr = DMPlexGetCone(*dm, i, &myCone);CHKERRQ(ierr);
-    //   ierr = DMPlexGetCone(dmc, i, &myCone);CHKERRQ(ierr);
-    //   //ierr = DMPlexGetConeSize(dmc,i ,&sz_cone);CHKERRQ(ierr);
-    //   //PetscPrintf(PETSC_COMM_SELF,"sz_cone: %d\n", sz_cone);
-    //
-    //
-    //
-    //   PetscInt tmpOffset[8];
-    //   PetscInt k =0;
-    //   for(j = 0; j < sz_perm_idx_Q1 ; j++){
-    //       PetscInt tmpdof;
-    //
-    //       PetscSectionGetDof(sectionQ1, myCone[j], &tmpdof);
-    //       //PetscSectionGetDof(section, myCone[j], &tmpdof);
-    //       //PetscPrintf(PETSC_COMM_SELF,"myCone[%d], %d\n", j , myCone[j]);
-    //       if (!tmpdof)  continue;
-    //        PetscSectionGetOffset(section, myCone[j], &tmpOffset[k++]);
-    //     }
-    //     for(j=0; j<k; j++){
-    //       //permute according to perm8_idx
-    //       tmp_connQ1[sz_perm_idx_Q1*i+j] = tmpOffset[perm8_idx[j]];
-    //     }
-    //
-    //
-    //
-    //
-    //   // for(j = 0; j < sz_perm_idx_Q1; j++){
-    //   //   tmp_connQ1[sz_perm_idx_Q1*i+j] = myCone[perm8_idx[j]];
-    //   // }
-  	// }
-    //
-    // //permute tmp_connQ1 based on ne
-    // PetscInt m = 0;
-    // for(k = 0; k < sz_connQ1/(ne*sz_perm_idx_Q1);k++){
-    //   for(j = 0; j< sz_perm_idx_Q1; j++){
-    //     for(i = 0; i < ne; i++){
-    //       connQ1[m] = tmp_connQ1[i*sz_perm_idx_Q1+j+k*(ne*sz_perm_idx_Q1)];
-    //       m++;
-    //     }
-    //   }
-    // }
+    //permute tmp_connQ1 based on ne
+    PetscInt m = 0;
+    for(k = 0; k < sz_connQ1/(ne*sz_perm_idx_Q1);k++){
+      for(j = 0; j< sz_perm_idx_Q1; j++){
+        for(i = 0; i < ne; i++){
+          connQ1[m] = tmp_connQ1[i*sz_perm_idx_Q1+j+k*(ne*sz_perm_idx_Q1)];
+          m++;
+        }
+      }
+    }
     ierr = PetscFree(tmp_connQ1);CHKERRQ(ierr);
   }
 
